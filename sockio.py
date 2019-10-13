@@ -1,73 +1,4 @@
 import io
-
-
-class Lock:
-    __slots__ = []
-    def _f(*args, **kwargs):
-        pass
-    acquire = release = __enter__ = __exit__ = _f
-
-_lock = Lock()
-
-
-def raw_write_readline(stream, data):
-    stream.write(data)
-    stream.flush()
-    return stream.readline()
-
-
-def write_readline(stream, data, lock=None):
-    lock = lock or _lock
-    with lock:
-        return raw_write_readline(stream, data)
-
-
-def raw_write_readlines(stream, data, nb_lines):
-    stream.write(data)
-    for n in range(nb_lines):
-        yield stream.readline()
-
-
-def write_readlines(stream, data, nb_lines, lock=None):
-    lock = lock or _lock
-    with lock:
-        for line in raw_write_readlines(stream, data, nb_lines):
-            yield line
-
-
-def raw_writelines_readlines(stream, lines, nb_lines=None):
-    if nb_lines is None:
-        nb_lines = len(lines)
-    stream.writelines(lines)
-    for n in range(nb_lines):
-        yield stream.readline()
-
-
-def writelines_readlines(stream, lines, nb_lines=None, lock=None):
-    lock = lock or _lock
-    with lock:
-        for line in raw_writelines_readlines(stream, data, nb_lines):
-            yield line
-
-
-
-def RequestReply(sock, mode='rwb', buffering=0, encoding=None, errors=None,
-           newline=None, lock=None):
-    stream = sock.makefile(mode=mode, buffering=buffering, encoding=encoding,
-                           errors=errors, newline=newline)
-
-    stream.write_readline = write_readline.__get__(stream)
-    stream.write_readlines = write_readlines.__get__(stream)
-    stream.writelines_readlines = writelines_readlines.__get__(stream)
-    return stream
-
-
-"""
-sock = socket.create_connection(('www.example.com', 8000))
-req_rep = sockio.RequestReply(sock)
-req_rep.write_readline(b'*IDN?\n')
-"""
-
 import socket
 import logging
 import functools
@@ -83,160 +14,165 @@ def ensure_connected(f):
     @functools.wraps(f)
     def wrapper(self, *args, **kwargs):
         if self.closed:
-            self.open()
+            self._open()
         return f(self, *args, **kwargs)
     return wrapper
 
 
-class RawSocket:
+class RawTCP:
 
-    def __init__(self, host, port, newline=b'\n'):
+    def __init__(self, host, port):
         self._addr = host, port
-        self._sock = None
-        self._buffer = None
-        self._read_event = None
-        self.newline = newline
-
-    def raw_read(self):
-        data = self._sock.recv(io.DEFAULT_BUFFER_SIZE)
-        self._log.debug(f'recv %r', data)
-        return data
-
-    def new_data_ready(self, data):
-        self._buffer += data
-        self._read_event.set()
-
-    def open(self):
         self._sock = socket.create_connection(self._addr)
+        self._sock.setblocking(False)
         self._buffer = b''
         self._read_event = threading.Event()
+        self._lock = threading.Lock()
+        self.closed = False
+
+    def raw_read(self):
+        # should only be called when we know an event as occurred
+        # because the socket is in non blocking mode
+        return self._sock.recv(io.DEFAULT_BUFFER_SIZE)
+
+    def new_data_ready(self, data):
+        with self._lock:
+            if not data:
+                self.closed = True
+            else:
+                self._buffer += data
+            self._read_event.set()
 
     def close(self):
-        if self._sock is not None:
-            self._sock.close()
-        self._sock = None
-        self._buffer = None
-        self._read_event = None
+        self._sock.close()
+        self.closed = True
+        self._read_event.set()
 
     def fileno(self):
         return self._sock.fileno()
 
-    def wait_newline(self):
+    def _waituntil(self, c):
         while True:
-            pos = self._buffer.find(self.newline)
+            pos = self._buffer.find(c)
             if pos != -1:
-                return pos + len(self.newline)
+                return pos + len(c)
             self._read_event.wait()
             self._read_event.clear()
+            if self.closed:
+                raise ConnectionError('lost connection while waiting for data')
 
-    def consume(self, n):
-        reply = self._buffer[:n]
-        self._buffer = self._buffer[n:]
+    def _waitexactly(self, n):
+        while True:
+            size = len(self._buffer)
+            if n <= size:
+                return
+            self._read_event.wait()
+            self._read_event.clear()
+            if self.closed:
+                raise ConnectionError('lost connection while waiting for data')
 
-    def consume_line(self):
-        reply, sep, self._buffer = self._buffer.partition(self.newline)
-        return reply + sep
+    def read(self, n):
+        with self._lock:
+            reply = self._buffer[:n]
+            self._buffer = self._buffer[n:]
+        return reply
+
+    def readuntil(self, separator=b'\n'):
+        n = self._waituntil(separator)
+        return self.read(n)
+
+    def readexactly(self, n):
+        self._waitexactly(n)
+        return self.read(n)
 
     def write(self, data):
         self._sock.sendall(data)
-        self._log.debug(f'sendall %r', data)
 
 
-class Socket:
+class TCP:
 
     def __init__(self, engine, host, port, newline=b'\n'):
-        self._addr = host, port
-        self._sock = None
-        self._buffer = None
-        self._read_event = None
-        self._lock = threading.Lock()
-        self._log = logging.getLogger(f'Socket({host}:{port})')
+        self._log = logging.getLogger(f'TCP({host}:{port})')
         self._engine = engine
-        self.closed = True
+        self._sock = None
+        self._lock = threading.Lock()
+        self.host = host
+        self.port = port
         self.newline = newline
-
+        self.closed = True
 
     def _on_new_data(self, sock, mask):
         assert sock == self
-        data = self._sock.recv(io.DEFAULT_BUFFER_SIZE)
+        data = self._sock.raw_read()
         self._log.debug(f'recv %r', data)
         if not data:
-            self.close()
-            return
-        with self._lock:
-            self._buffer += data
-            self._read_event.set()
+            self._close()
+        self._sock.new_data_ready(data)
 
-    def open(self):
+    def _open(self):
         if not self.closed:
             raise Exception('must close socket before opening')
+        self._sock = RawTCP(self.host, self.port)
+        self.closed = False
+        self._engine.register(self, self._on_new_data)
+
+    def _close(self):
+        if self._sock is not None:
+            self._sock.close()
+            self._engine.unregister(self)
+        self.closed = True
+
+    def open(self):
         with self._lock:
-            self._sock = socket.create_connection(self._addr)
-            self._buffer = b''
-            self._read_event = threading.Event()
-            self.closed = False
-            self._engine.register(self, self._on_new_data)
+            self._open()
 
     def close(self):
         with self._lock:
-            if self._sock is not None:
-                self._engine.unregister(self._sock)
-                self._sock.close()
-            self._sock = None
-            self._buffer = None
-            self._read_event = None
-            self.closed = True
+            self._close()
+
+    def _write(self, data):
+        self._sock.write(data)
+        self._log.debug(f'sendall %r', data)
+
+    def _readline(self):
+        return self._sock.readuntil(self.newline)
+
+    def _readlines(self, n):
+        for i in range(n):
+            yield self._readline()
 
     @ensure_connected
     def fileno(self):
         return self._sock.fileno()
 
     @ensure_connected
-    def readline(self):
-        newline = self.newline
-        newline_size = len(newline)
-        while True:
-            pos = self._buffer.find(newline)
-            if pos != -1:
-                break
-            self._read_event.wait()
-            self._read_event.clear()
-        with self._lock:
-            reply = self._buffer[:pos + newline_size]
-            self._buffer = self._buffer[pos + newline_size:]
-        return reply
-
-    @ensure_connected
-    def readlines(self, hint=-1):
-        return self._stream.readlines(hint)
-
-    @ensure_connected
     def write(self, data):
-        self._sock.sendall(data)
-        self._log.debug(f'sendall %r', data)
+        with self._lock:
+            self._write(data)
 
     @ensure_connected
-    def writelines(self, lines):
-        return self._stream.writelines(lines)
+    def readline(self):
+        with self._lock:
+            return self._readline()
 
     @ensure_connected
     def write_readline(self, data):
-        self._stream.write(data)
-        return self._stream.readline()
+        with self._lock:
+            self._write(data)
+            return self._readline()
+
+    @ensure_connected
+    def readlines(self, n):
+        with self._lock:
+            for i in range(n):
+                yield self._readline()
 
     @ensure_connected
     def write_readlines(self, data, nb_lines):
-        self._stream.write(data)
-        for i in range(nb_lines):
-            yield self._stream.readline()
-
-    @ensure_connected
-    def writelines_readlines(self, lines, nb_lines=None):
-        if nb_lines is None:
-            nb_lines = len(lines)
-        self._stream.writelines(lines)
-        for i in range(nb_lines):
-            yield self._stream.readline()
+        with self._lock:
+            self._write(data)
+            for line in self._readlines():
+                yield line
 
 
 class Engine:
@@ -280,18 +216,26 @@ class Engine:
         else:
             raise Exception('Unknown command {}'.format(command))
 
-    def socket(self, host, port, newline=b'\n'):
-        return Socket(self, host, port, newline=newline)
+    def tcp(self, host, port, newline=b'\n'):
+        return TCP(self, host, port, newline=newline)
+
+    def channel(self, url):
+        if url.startswith('tcp://'):
+            host, port = url[6:].split(':', 1)
+            return self.tcp(host, int(port))
+        raise ValueError('Unknown connection type')
 
 
 if __name__ == '__main__':
     logging.basicConfig(level='INFO')
     engine = Engine()
     engine.start()
-    sock = engine.socket('localhost', 12345)
+    sock = engine.tcp('localhost', 12345)
     sock._log.setLevel(logging.DEBUG)
     sock.write(b'*IDN?\n')
     print(sock.readline())
+    print(sock.write_readline(b'*IDN?\n'))
+
 
 """
 engine = Engine()
