@@ -2,7 +2,7 @@
 
 A concurrency agnostic socket library on python.
 
-So far implemented REQ-REP semantics.
+So far implemented REQ-REP semantics with auto-reconnection facilites.
 
 Implementations for:
 
@@ -23,3 +23,30 @@ pip install sockio
 ```
 
 
+## Usage
+
+*asyncio*
+
+```python
+import asyncio
+from sockio.aio import Socket
+
+async def main():
+    sock = Socket('acme.example.com', 5000)
+    # Assuming a SCPI complient on the other end we can ask for:
+    reply = await sock.write_readline(b'*IDN?\n')
+    print(reply)
+
+asyncio.run(main())
+```
+
+*classic*
+
+```python
+from sockio.sio import Socket
+
+sock = Socket('acme.example.com', 5000)
+# Assuming a SCPI complient on the other end we can ask for:
+reply = sock.write_readline(b'*IDN?\n')
+print(reply)
+```
