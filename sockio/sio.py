@@ -1,6 +1,9 @@
+import asyncio
+import inspect
+import functools
 import threading
 
-from .aio import Socket
+from . import aio
 
 
 class BaseProxy:
@@ -63,8 +66,10 @@ class EventLoop(threading.Thread):
             self.proxies[key] = Proxy
         return Proxy(obj)
 
-    def socket(self, host, port, eol=b'\n', resolve_futures=False):
-        return self.proxy(Socket(host, port, eol), resolve_futures)
+    def socket(self, host, port, eol=b'\n', auto_reconnect=True,
+               resolve_futures=False):
+        sock = aio.Socket(host, port, eol=eol, auto_reconnect=auto_reconnect)
+        return self.proxy(sock, resolve_futures)
 
 
 DefaultEventLoop = EventLoop()

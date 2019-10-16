@@ -1,28 +1,38 @@
 import asyncio
-import inspect
 import functools
+
+
+def ensure_connection(f):
+    @functools.wraps(f)
+    async def wrapper(self, *args, **kwargs):
+        if self._auto_reconnect and not self.connected:
+            await self.open()
+        return await f(self, *args, **kwargs)
+    return wrapper
 
 
 class Socket:
 
-    def __init__(self, host, port, eol=b'\n'):
+    def __init__(self, host, port, eol=b'\n', auto_reconnect=True):
         self._host = host
         self._port = port
         self._eol = eol
         self._reader = None
         self._writer = None
-
-    async def _ensure_connected(self):
-        if not self.connected:
-            await self.open()
+        self._auto_reconnect = auto_reconnect
 
     async def open(self):
+        if self._writer:
+            await self.close()
         self._reader, self._writer = await asyncio.open_connection(
             self._host, self._port)
 
     @property
     def connected(self):
-        return False if self._reader is None else not self._reader.at_eof()
+        if self._reader is None:
+            return False
+        eof = self._reader.at_eof()
+        return not eof
 
     async def read(self, n=-1):
         await self._ensure_connected()
@@ -54,14 +64,8 @@ class Socket:
         self._writer.writelines(lines)
         await self._writer.drain()
 
+    @ensure_connection
     async def write_readline(self, data):
-        await self._ensure_connected()
-        self._writer.write(data)
-        await self._writer.drain()
-        return await self._reader.readline()
-
-    async def write_readline(self, data):
-        await self._ensure_connected()
         self._writer.write(data)
         await self._writer.drain()
         return await self._reader.readline()
@@ -85,3 +89,5 @@ class Socket:
     async def close(self):
         self._writer.close()
         await self._writer.wait_closed()
+        self._reader = None
+        self._writer = None
