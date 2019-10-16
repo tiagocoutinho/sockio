@@ -104,8 +104,10 @@ class TCP:
     def _on_new_data(self, sock, mask):
         assert sock == self
         data = self._sock.raw_read()
-        self._log.debug(f'recv %r', data)
-        if not data:
+        if data:
+            self._log.debug(f'recv %r', data)
+        else:
+            self._log.debug('disconnected')
             self._close()
         self._sock.new_data_ready(data)
 
@@ -178,34 +180,47 @@ class TCP:
 class Engine:
 
     def __init__(self):
-        self.sel = selectors.DefaultSelector()
-        self._task = None
+        self._sel = selectors.DefaultSelector()
         self._reader, self._writer = socket.socketpair()
         self._reader.setblocking(False)
         self._reader_stream = self._reader.makefile('rb', 0)
-        self.sel.register(self._reader, selectors.EVENT_READ, self._on_action)
+        self._sel.register(self._reader, selectors.EVENT_READ, self._on_action)
+        self._started = threading.Event()
+
+    @property
+    def running(self):
+        return self._started.is_set()
 
     def start(self):
-        self._task = threading.Thread(target=self.run, name='sockio.EngineTH')
-        self._task.daemon = True
-        self._task.start()
+        if self.running:
+            raise RuntimeError('Engine already started')
+        task = threading.Thread(target=self.run, name='sockio.EngineTH')
+        task.daemon = True
+        task.start()
+        self._started.wait()
+
+    def stop(self):
+        if self.running:
+            self._writer.sendall(b'stop\n')
 
     def run(self):
+        self._started.set()
         while True:
-            events = self.sel.select()
+            events = self._sel.select()
             for event, event_type in events:
                 try:
                     event.data(event.fileobj, event_type)
                 except StopEngine:
+                    self._started.clear()
                     return
                 except:
                     logging.exception('Error handling event:')
 
     def register(self, conn, cb, mask=selectors.EVENT_READ):
-        self.sel.register(conn, mask, cb)
+        self._sel.register(conn, mask, cb)
 
     def unregister(self, conn):
-        self.sel.unregister(conn)
+        self._sel.unregister(conn)
 
     def _on_action(self, sock, event_type):
         assert event_type == selectors.EVENT_READ
@@ -217,6 +232,8 @@ class Engine:
             raise Exception('Unknown command {}'.format(command))
 
     def tcp(self, host, port, newline=b'\n'):
+        if not self.running:
+            self.start()
         return TCP(self, host, port, newline=newline)
 
     def channel(self, url):
@@ -224,6 +241,12 @@ class Engine:
             host, port = url[6:].split(':', 1)
             return self.tcp(host, int(port))
         raise ValueError('Unknown connection type')
+
+
+_default_engine = Engine()
+
+tcp = _default_engine.tcp
+channel = _default_engine.channel
 
 
 if __name__ == '__main__':
@@ -237,8 +260,3 @@ if __name__ == '__main__':
     print(sock.write_readline(b'*IDN?\n'))
 
 
-"""
-engine = Engine()
-tcp = engine.TCP('localhost', 8000)
-tcp.write_readline(b'*IDN?\n')
-"""
