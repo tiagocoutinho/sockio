@@ -1,5 +1,4 @@
 import asyncio
-import inspect
 import functools
 import threading
 
@@ -49,7 +48,7 @@ class EventLoop(threading.Thread):
             if name.startswith('_'):
                 continue
             member = getattr(klass, name)
-            if inspect.iscoroutinefunction(member):
+            if asyncio.iscoroutinefunction(member):
                 member = self._create_coroutine_threadsafe(
                     member, resolve_futures)
             setattr(Proxy, name, member)
