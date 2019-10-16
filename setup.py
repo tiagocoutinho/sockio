@@ -16,7 +16,7 @@ TESTING = any(x in sys.argv for x in ["test", "pytest"])
 setup_requirements = []
 if TESTING:
     setup_requirements += ['pytest-runner']
-test_requirements = ['pytest', 'pytest-cov']
+test_requirements = ['pytest', 'pytest-cov', 'pytest-asyncio']
 
 
 setup(
