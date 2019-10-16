@@ -31,18 +31,18 @@ class EventLoop(threading.Thread):
         f = functools.partial(func, *args, **kwargs)
         return self.loop.call_soon_threadsafe(f)
 
-    def run_coroutine(self, coro, wait=False):
-         future = asyncio.run_coroutine_threadsafe(coro, self.loop)
-         return future.result() if wait else future
+    def run_coroutine(self, coro):
+         return asyncio.run_coroutine_threadsafe(coro, self.loop)
 
-    def _create_coroutine_threadsafe(self, corof, result_futures):
+    def _create_coroutine_threadsafe(self, corof, resolve_future):
         @functools.wraps(corof)
         def wrapper(obj, *args, **kwargs):
             coro = corof(obj._ref, *args, **kwargs)
-            return self.run_coroutine(coro, wait=result_futures)
+            future = self.run_coroutine(coro)
+            return future.result() if resolve_future else future
         return wrapper
 
-    def _create_proxy_for(self, klass, resolve_futures=False):
+    def _create_proxy_for(self, klass, resolve_futures=True):
         class Proxy(BaseProxy):
             pass
         for name in dir(klass):
@@ -55,7 +55,7 @@ class EventLoop(threading.Thread):
             setattr(Proxy, name, member)
         return Proxy
 
-    def proxy(self, obj, resolve_futures=False):
+    def proxy(self, obj, resolve_futures=True):
         if not self.is_alive():
             self.start()
         klass = type(obj)
@@ -67,7 +67,7 @@ class EventLoop(threading.Thread):
         return Proxy(obj)
 
     def socket(self, host, port, eol=b'\n', auto_reconnect=True,
-               resolve_futures=False):
+               resolve_futures=True):
         sock = aio.Socket(host, port, eol=eol, auto_reconnect=auto_reconnect)
         return self.proxy(sock, resolve_futures)
 
