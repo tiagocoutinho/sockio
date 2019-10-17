@@ -10,18 +10,6 @@ Implementations for:
 * future based API
 * asyncio
 
-Join the party by bringing your own concurrency library with a PR!
-
-I am looking in particular for implementations over trio and curio.
-
-## Missing features
-
-* Timeouts
-* Connection retries
-* trio event loop
-* curio event loop
-* Stream semantics
-
 ## Installation
 
 From within your favourite python environment:
@@ -84,6 +72,22 @@ print(reply)
 reply = await sock.write_readline(b'*IDN?\n')
 print(reply)
 ```
+
+## Missing features
+
+* Timeouts
+* Connection retries
+* trio event loop
+* curio event loop
+* Stream semantics
+
+Join the party by bringing your own concurrency library with a PR!
+
+I am looking in particular for implementations over trio and curio.
+
+
+
+
 
 
 
