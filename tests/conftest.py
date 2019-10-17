@@ -1,21 +1,27 @@
+import queue
 import asyncio
 
 import pytest
 
 import sockio.aio
+import sockio.sio
 
 
-@pytest.fixture()
-async def server():
+IDN_REQ, IDN_REP = b'*idn?\n', b'ACME, bla ble ble, 1234, 5678\n'
+WRONG_REQ, WRONG_REP = b'wrong question\n', b'ERROR: unknown command\n'
+
+
+def server_coro():
+    data = dict(nb_clients=0)
     async def cb(reader, writer):
         try:
             while True:
                 data = await reader.readline()
-                if data.upper() == b'*IDN?\n':
-                    msg = b'ACME, bla ble ble, 1234, 5678\n'
+                if data.lower() == IDN_REQ:
+                    msg = IDN_REP
                 else:
-                    msg = b'ERROR: unknown command\n'
-                # TODO: figure out why putting sleep where triggers:
+                    msg = WRONG_REP
+                # TODO: figure out why putting sleep here triggers:
                 # "Task was destroyed but it is pending!" messages
                 # await asyncio.sleep(0.1)
                 writer.write(msg)
@@ -23,15 +29,42 @@ async def server():
         except:
             pass
 
-    server = await asyncio.start_server(cb, host='0')
+    return asyncio.start_server(cb, host='0')
+
+
+@pytest.fixture()
+async def aio_server():
+    server = await server_coro()
     task = asyncio.create_task(server.serve_forever())
     yield server
     server.close()
 
 
 @pytest.fixture
-async def aio_sock(server):
-    addr = server.sockets[0].getsockname()
+async def aio_sock(aio_server):
+    addr = aio_server.sockets[0].getsockname()
     sock = sockio.aio.Socket(*addr)
     yield sock
     await sock.close()
+
+
+@pytest.fixture()
+def sio_server():
+    event_loop = sockio.sio.DefaultEventLoop
+    channel = queue.Queue()
+    async def serve_forever():
+        server = await server_coro()
+        channel.put(server)
+        await server.serve_forever()
+    event_loop.run_coroutine(serve_forever())
+    server = event_loop.proxy(channel.get())
+    yield server
+    server.close()
+
+
+@pytest.fixture
+def sio_sock(sio_server):
+    addr = sio_server.sockets[0].getsockname()
+    sock = sockio.sio.Socket(*addr)
+    yield sock
+    sock.close()

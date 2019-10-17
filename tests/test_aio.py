@@ -1,8 +1,11 @@
 import asyncio
+import inspect
 
 import pytest
 
 from sockio.aio import Socket
+
+from conftest import IDN_REQ, IDN_REP, WRONG_REQ, WRONG_REP
 
 
 def test_socket_creation():
@@ -29,7 +32,7 @@ async def test_write_fail(unused_tcp_port):
     assert not sock.connected
 
     with pytest.raises(ConnectionRefusedError):
-        await sock.write(b'*idn?\n')
+        await sock.write(IDN_REQ)
     assert not sock.connected
 
 
@@ -39,13 +42,15 @@ async def test_write_readline_fail(unused_tcp_port):
     assert not sock.connected
 
     with pytest.raises(ConnectionRefusedError):
-        await sock.write_readline(b'*idn?\n')
+        await sock.write_readline(IDN_REQ)
     assert not sock.connected
 
 
 @pytest.mark.asyncio
-async def test_open_close(server, aio_sock):
+async def test_open_close(aio_server, aio_sock):
     assert not aio_sock.connected
+    assert aio_server.sockets[0].getsockname() == (aio_sock.host, aio_sock.port)
+
     await aio_sock.open()
     assert aio_sock.connected
 
@@ -63,12 +68,9 @@ async def test_open_close(server, aio_sock):
 
 
 @pytest.mark.asyncio
-async def test_write_readline(server, aio_sock):
-    assert not aio_sock.connected
-    assert server.sockets[0].getsockname() == (aio_sock.host, aio_sock.port)
-
-    for request, expected in [(b'*idn?\n',  b'ACME, bla ble ble, 1234, 5678\n'),
-                              (b'wrong question\n',  b'ERROR: unknown command\n')]:
+async def test_write_readline(aio_sock):
+    for request, expected in [(IDN_REQ,  IDN_REP),
+                              (WRONG_REQ,  WRONG_REP)]:
         coro = aio_sock.write_readline(request)
         assert asyncio.iscoroutine(coro)
         reply = await coro
@@ -77,12 +79,48 @@ async def test_write_readline(server, aio_sock):
 
 
 @pytest.mark.asyncio
-async def test_readline(server, aio_sock):
-    assert not aio_sock.connected
-    assert server.sockets[0].getsockname() == (aio_sock.host, aio_sock.port)
+async def test_write_readlines(aio_sock):
+    for request, expected in [(IDN_REQ,  [IDN_REP]), (2*IDN_REQ,  2*[IDN_REP]),
+                              (IDN_REQ + WRONG_REQ,  [IDN_REP, WRONG_REP])]:
+        async_gen = aio_sock.write_readlines(request, len(expected))
+        assert inspect.isasyncgen(async_gen)
+        reply = [line async for line in async_gen]
+        assert aio_sock.connected
+        assert expected == reply
 
-    for request, expected in [(b'*idn?\n',  b'ACME, bla ble ble, 1234, 5678\n'),
-                              (b'wrong question\n',  b'ERROR: unknown command\n')]:
+
+@pytest.mark.asyncio
+async def test_writelines_readlines(aio_sock):
+    for request, expected in [([IDN_REQ],  [IDN_REP]), (2*[IDN_REQ],  2*[IDN_REP]),
+                              ([IDN_REQ, WRONG_REQ],  [IDN_REP, WRONG_REP])]:
+        async_gen = aio_sock.writelines_readlines(request)
+        assert inspect.isasyncgen(async_gen)
+        reply = [line async for line in async_gen]
+        assert aio_sock.connected
+        assert expected == reply
+
+
+@pytest.mark.asyncio
+async def test_writelines(aio_sock):
+    for request, expected in [([IDN_REQ],  [IDN_REP]), (2*[IDN_REQ],  2*[IDN_REP]),
+                              ([IDN_REQ, WRONG_REQ],  [IDN_REP, WRONG_REP])]:
+        coro = aio_sock.writelines(request)
+        assert asyncio.iscoroutine(coro)
+        answer = await coro
+        assert aio_sock.connected
+        assert answer is None
+
+        async_gen = aio_sock.readlines(len(expected))
+        assert inspect.isasyncgen(async_gen)
+        reply = [line async for line in async_gen]
+        assert aio_sock.connected
+        assert expected == reply
+
+
+@pytest.mark.asyncio
+async def test_readline(aio_sock):
+    for request, expected in [(IDN_REQ,  IDN_REP),
+                              (WRONG_REQ,  WRONG_REP)]:
         coro = aio_sock.write(request)
         assert asyncio.iscoroutine(coro)
         answer = await coro
@@ -95,12 +133,58 @@ async def test_readline(server, aio_sock):
 
 
 @pytest.mark.asyncio
-async def test_read(server, aio_sock):
-    assert not aio_sock.connected
-    assert server.sockets[0].getsockname() == (aio_sock.host, aio_sock.port)
+async def test_readuntil(aio_sock):
+    for request, expected in [(IDN_REQ,  IDN_REP),
+                              (WRONG_REQ,  WRONG_REP)]:
+        coro = aio_sock.write(request)
+        assert asyncio.iscoroutine(coro)
+        answer = await coro
+        assert aio_sock.connected
+        assert answer is None
+        coro = aio_sock.readuntil(b'\n')
+        assert asyncio.iscoroutine(coro)
+        reply = await coro
+        assert expected == reply
 
-    for request, expected in [(b'*idn?\n',  b'ACME, bla ble ble, 1234, 5678\n'),
-                              (b'wrong question\n',  b'ERROR: unknown command\n')]:
+
+@pytest.mark.asyncio
+async def test_readexactly(aio_sock):
+    for request, expected in [(IDN_REQ,  IDN_REP),
+                              (WRONG_REQ,  WRONG_REP)]:
+        coro = aio_sock.write(request)
+        assert asyncio.iscoroutine(coro)
+        answer = await coro
+        assert aio_sock.connected
+        assert answer is None
+        coro = aio_sock.readexactly(len(expected) - 5)
+        assert asyncio.iscoroutine(coro)
+        reply = await coro
+        assert expected[:-5] == reply
+        coro = aio_sock.readexactly(5)
+        assert asyncio.iscoroutine(coro)
+        reply = await coro
+        assert expected[-5:] == reply
+
+
+@pytest.mark.asyncio
+async def test_readlines(aio_sock):
+    for request, expected in [(IDN_REQ,  [IDN_REP]), (2*IDN_REQ,  2*[IDN_REP]),
+                              (IDN_REQ + WRONG_REQ,  [IDN_REP, WRONG_REP])]:
+        coro = aio_sock.write(request)
+        assert asyncio.iscoroutine(coro)
+        answer = await coro
+        assert aio_sock.connected
+        assert answer is None
+        async_gen = aio_sock.readlines(len(expected))
+        assert inspect.isasyncgen(async_gen)
+        reply = [line async for line in async_gen]
+        assert expected == reply
+
+
+@pytest.mark.asyncio
+async def test_read(aio_sock):
+    for request, expected in [(IDN_REQ,  IDN_REP),
+                              (WRONG_REQ,  WRONG_REP)]:
         coro = aio_sock.write(request)
         assert asyncio.iscoroutine(coro)
         answer = await coro
