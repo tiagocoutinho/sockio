@@ -59,7 +59,6 @@ class Socket:
 
     @ensure_connection
     async def readuntil(self, separator=b'\n'):
-        await self._ensure_connected()
         return await self._reader.readuntil(separator)
 
     @ensure_connection
