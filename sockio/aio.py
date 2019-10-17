@@ -27,6 +27,7 @@ class Socket:
         self.host = host
         self.port = port
         self.auto_reconnect = auto_reconnect
+        self.connection_counter = 0
         self._reader = None
         self._writer = None
         self._lock = asyncio.Lock()
@@ -36,6 +37,7 @@ class Socket:
             raise ConnectionError('socket already open. must close it first')
         self._reader, self._writer = await asyncio.open_connection(
             self.host, self.port)
+        self.connection_counter += 1
 
     async def close(self):
         if self._writer is not None:
