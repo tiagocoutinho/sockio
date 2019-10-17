@@ -1,15 +1,24 @@
 import asyncio
+import inspect
 import functools
 
 
 def ensure_connection(f):
-    @functools.wraps(f)
-    async def wrapper(self, *args, **kwargs):
-        async with self._lock:
-            if self.auto_reconnect and not self.connected:
-                await self.open()
-            return await f(self, *args, **kwargs)
-    return wrapper
+    if asyncio.iscoroutinefunction(f):
+        async def wrapper(self, *args, **kwargs):
+            async with self._lock:
+                if self.auto_reconnect and not self.connected:
+                    await self.open()
+                return await f(self, *args, **kwargs)
+    elif inspect.isasyncgenfunction(f):
+        async def wrapper(self, *args, **kwargs):
+            async with self._lock:
+                if self.auto_reconnect and not self.connected:
+                    await self.open()
+                async_gen = f(self, *args, **kwargs)
+            async for line in async_gen:
+                yield line
+    return functools.wraps(f)(wrapper)
 
 
 class Socket:
