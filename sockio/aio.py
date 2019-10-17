@@ -1,24 +1,8 @@
 import asyncio
 import inspect
-import functools
+import logging
 
-
-def ensure_connection(f):
-    if asyncio.iscoroutinefunction(f):
-        async def wrapper(self, *args, **kwargs):
-            async with self._lock:
-                if self.auto_reconnect and not self.connected:
-                    await self.open()
-                return await f(self, *args, **kwargs)
-    elif inspect.isasyncgenfunction(f):
-        async def wrapper(self, *args, **kwargs):
-            async with self._lock:
-                if self.auto_reconnect and not self.connected:
-                    await self.open()
-                async_gen = f(self, *args, **kwargs)
-            async for line in async_gen:
-                yield line
-    return functools.wraps(f)(wrapper)
+from .util import log, ensure_connection
 
 
 class Socket:
@@ -30,15 +14,19 @@ class Socket:
         self.connection_counter = 0
         self._reader = None
         self._writer = None
+        self._log = logging.getLogger('sockio.Socket({}:{})'.format(host, port))
         self._lock = asyncio.Lock()
 
+    @log
     async def open(self):
         if self.connected:
             raise ConnectionError('socket already open. must close it first')
+        self._log.debug('open connection (#%d)', self.connection_counter + 1)
         self._reader, self._writer = await asyncio.open_connection(
             self.host, self.port)
         self.connection_counter += 1
 
+    @log
     async def close(self):
         if self._writer is not None:
             self._writer.close()
@@ -53,43 +41,52 @@ class Socket:
         eof = self._reader.at_eof()
         return not eof
 
+    @log
     @ensure_connection
     async def read(self, n=-1):
         return await self._reader.read(n)
 
+    @log
     @ensure_connection
     async def readline(self):
         return await self._reader.readline()
 
+    @log
     @ensure_connection
     async def readlines(self, n):
         for i in range(n):
             yield await self._reader.readline()
 
+    @log
     @ensure_connection
     async def readexactly(self, n):
         return await self._reader.readexactly(n)
 
+    @log
     @ensure_connection
     async def readuntil(self, separator=b'\n'):
         return await self._reader.readuntil(separator)
 
+    @log
     @ensure_connection
     async def write(self, data):
         self._writer.write(data)
         await self._writer.drain()
 
+    @log
     @ensure_connection
     async def writelines(self, lines):
         self._writer.writelines(lines)
         await self._writer.drain()
 
+    @log
     @ensure_connection
     async def write_readline(self, data):
         self._writer.write(data)
         await self._writer.drain()
         return await self._reader.readline()
 
+    @log
     @ensure_connection
     async def write_readlines(self, data, n):
         self._writer.write(data)
@@ -97,6 +94,7 @@ class Socket:
         for i in range(n):
             yield await self._reader.readline()
 
+    @log
     @ensure_connection
     async def writelines_readlines(self, lines, n=None):
         if n is None:
@@ -110,20 +108,30 @@ class Socket:
 def app(options):
     async def run():
         sock = Socket(options.host, options.port)
-        print(await sock.write_readline(options.request.encode()))
-    asyncio.run(run())
+        request = options.request
+        lines = request.count('\n')
+        async for r in sock.write_readlines(request.encode(), lines):
+            print(r)
+    asyncio.run(run(), debug=options.debug)
 
 
 def main(cb, args=None):
     import argparse
     parser = argparse.ArgumentParser()
+    log_level_choices = ["critical", "error", "warning", "info", "debug"]
+    log_level_choices += [i.upper() for i in log_level_choices]
     parser.add_argument('--host', default='0',
                         help='SCPI device host name / IP')
     parser.add_argument('-p', '--port', type=int, help='SCPI device port')
     parser.add_argument('-r', '--request', default='*IDN?\n',
                         help='SCPI request [%(default)s]')
-
+    parser.add_argument("--log-level", choices=log_level_choices, default="warning")
+    parser.add_argument('-d', '--debug', action='store_true')
     options = parser.parse_args(args)
+    if not options.request.endswith('\n'):
+        options.request += '\n'
+    fmt = '%(asctime)-15s %(levelname)-5s %(threadName)s %(name)s: %(message)s'
+    logging.basicConfig(level=options.log_level.upper(), format=fmt)
     cb(options)
 
 

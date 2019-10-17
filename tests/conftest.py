@@ -21,9 +21,8 @@ def server_coro():
                     msg = IDN_REP
                 else:
                     msg = WRONG_REP
-                # TODO: figure out why putting sleep here triggers:
-                # "Task was destroyed but it is pending!" messages
-                # await asyncio.sleep(0.1)
+                # add 2ms delay
+                await asyncio.sleep(0.002)
                 writer.write(msg)
                 await writer.drain()
         except:

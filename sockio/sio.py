@@ -93,14 +93,21 @@ class EventLoop(threading.Thread):
         sock = aio.Socket(host, port, auto_reconnect=auto_reconnect)
         return self.proxy(sock, resolve_futures)
 
+    def set_debug(self, debug):
+        self.loop.set_debug(debug)
+
 
 DefaultEventLoop = EventLoop()
 Socket = DefaultEventLoop.socket
 
 
 def app(options):
+    DefaultEventLoop.set_debug(options.debug)
     sock = Socket(options.host, options.port)
-    print(sock.write_readline(options.request.encode()))
+    request = options.request
+    lines = request.count('\n')
+    for r in sock.write_readlines(request.encode(), lines):
+        print(r)
 
 
 if __name__ == '__main__':
