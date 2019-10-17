@@ -98,3 +98,11 @@ DefaultEventLoop = EventLoop()
 Socket = DefaultEventLoop.socket
 
 
+def app(options):
+    sock = Socket(options.host, options.port)
+    print(sock.write_readline(options.request.encode()))
+
+
+if __name__ == '__main__':
+    from .aio import main
+    main(app)

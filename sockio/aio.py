@@ -106,3 +106,26 @@ class Socket:
         for i in range(n):
             yield await self._reader.readline()
 
+
+def app(options):
+    async def run():
+        sock = Socket(options.host, options.port)
+        print(await sock.write_readline(options.request.encode()))
+    asyncio.run(run())
+
+
+def main(cb, args=None):
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--host', default='0',
+                        help='SCPI device host name / IP')
+    parser.add_argument('-p', '--port', type=int, help='SCPI device port')
+    parser.add_argument('-r', '--request', default='*IDN?\n',
+                        help='SCPI request [%(default)s]')
+
+    options = parser.parse_args(args)
+    cb(options)
+
+
+if __name__ == '__main__':
+    main(app)
