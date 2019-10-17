@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import functools
 import threading
 
@@ -9,6 +10,18 @@ class BaseProxy:
 
     def __init__(self, ref):
         self._ref = ref
+
+    def __getattr__(self, name):
+        return getattr(self._ref, name)
+
+
+def ensure_running(f):
+    @functools.wraps(f)
+    def wrapper(self, *args, **kwargs):
+        if not self.is_alive():
+            self.start()
+        return f(self, *args, **kwargs)
+    return wrapper
 
 
 class EventLoop(threading.Thread):
@@ -26,10 +39,12 @@ class EventLoop(threading.Thread):
     def stop(self):
         self.loop.call_soon_threadsafe(self.loop.stop)
 
+    @ensure_running
     def call_soon(self, func, *args, **kwargs):
         f = functools.partial(func, *args, **kwargs)
         return self.loop.call_soon_threadsafe(f)
 
+    @ensure_running
     def run_coroutine(self, coro):
          return asyncio.run_coroutine_threadsafe(coro, self.loop)
 
@@ -41,6 +56,11 @@ class EventLoop(threading.Thread):
             return future.result() if resolve_future else future
         return wrapper
 
+    def _create_asyncgenerator_threadsafe(self, async_genf, resolve_future):
+        async def corof(*args, **kwargs):
+            return [i async for i in async_genf(*args, **kwargs)]
+        return self._create_coroutine_threadsafe(corof, resolve_future)
+
     def _create_proxy_for(self, klass, resolve_futures=True):
         class Proxy(BaseProxy):
             pass
@@ -51,12 +71,14 @@ class EventLoop(threading.Thread):
             if asyncio.iscoroutinefunction(member):
                 member = self._create_coroutine_threadsafe(
                     member, resolve_futures)
+            elif inspect.isasyncgenfunction(member):
+                member = self._create_asyncgenerator_threadsafe(
+                    member, resolve_futures)
             setattr(Proxy, name, member)
         return Proxy
 
+    @ensure_running
     def proxy(self, obj, resolve_futures=True):
-        if not self.is_alive():
-            self.start()
         klass = type(obj)
         key = klass, resolve_futures
         Proxy = self.proxies.get(key)
@@ -65,9 +87,10 @@ class EventLoop(threading.Thread):
             self.proxies[key] = Proxy
         return Proxy(obj)
 
-    def socket(self, host, port, eol=b'\n', auto_reconnect=True,
+    @ensure_running
+    def socket(self, host, port, auto_reconnect=True,
                resolve_futures=True):
-        sock = aio.Socket(host, port, eol=eol, auto_reconnect=auto_reconnect)
+        sock = aio.Socket(host, port, auto_reconnect=auto_reconnect)
         return self.proxy(sock, resolve_futures)
 
 
