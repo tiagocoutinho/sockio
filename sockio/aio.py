@@ -1,5 +1,4 @@
 import asyncio
-import inspect
 import logging
 
 from .util import log, ensure_connection
@@ -54,8 +53,10 @@ class Socket:
     @log
     @ensure_connection
     async def readlines(self, n):
-        for i in range(n):
-            yield await self._reader.readline()
+        result = []
+        async for i in range(n):
+            result.append(await self._reader.readline())
+        return result
 
     @log
     @ensure_connection
@@ -91,8 +92,10 @@ class Socket:
     async def write_readlines(self, data, n):
         self._writer.write(data)
         await self._writer.drain()
-        for i in range(n):
-            yield await self._reader.readline()
+        result = []
+        async for i in range(n):
+            result.append(await self._reader.readline())
+        return result
 
     @log
     @ensure_connection
@@ -101,8 +104,10 @@ class Socket:
             n = len(lines)
         self._writer.writelines(lines)
         await self._writer.drain()
-        for i in range(n):
-            yield await self._reader.readline()
+        result = []
+        async for i in range(n):
+            result.append(await self._reader.readline())
+        return result
 
 
 def app(options):

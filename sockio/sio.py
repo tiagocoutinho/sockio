@@ -1,5 +1,4 @@
 import asyncio
-import inspect
 import functools
 import threading
 
@@ -58,7 +57,10 @@ class EventLoop(threading.Thread):
 
     def _create_asyncgenerator_threadsafe(self, async_genf, resolve_future):
         async def corof(*args, **kwargs):
-            return [i async for i in async_genf(*args, **kwargs)]
+            result = []
+            async for item in async_genf(*args, **kwargs):
+                result.append(await item)
+            return result
         return self._create_coroutine_threadsafe(corof, resolve_future)
 
     def _create_proxy_for(self, klass, resolve_futures=True):
@@ -70,9 +72,6 @@ class EventLoop(threading.Thread):
             member = getattr(klass, name)
             if asyncio.iscoroutinefunction(member):
                 member = self._create_coroutine_threadsafe(
-                    member, resolve_futures)
-            elif inspect.isasyncgenfunction(member):
-                member = self._create_asyncgenerator_threadsafe(
                     member, resolve_futures)
             setattr(Proxy, name, member)
         return Proxy

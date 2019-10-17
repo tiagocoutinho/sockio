@@ -1,5 +1,4 @@
 import asyncio
-import inspect
 import functools
 
 
@@ -27,13 +26,6 @@ def log(f):
             else:
                 self._log.debug('[O] %s %r', name, log_args(result))
             return result
-    elif inspect.isasyncgenfunction(f):
-        @functools.wraps(f)
-        async def wrapper(self, *args, **kwargs):
-            self._log.debug('[I] %s (%r)', name, log_args(*args))
-            async for item in f(self, *args, **kwargs):
-                self._log.debug('[Y] %s %s', name, log_args(item))
-                yield item
     else:
         @functools.wraps(f)
         def wrapper(self, *args, **kwargs):
@@ -46,17 +38,11 @@ def log(f):
 
 def ensure_connection(f):
     if asyncio.iscoroutinefunction(f):
+        @functools.wraps(f)
         async def wrapper(self, *args, **kwargs):
             async with self._lock:
                 if self.auto_reconnect and not self.connected:
                     await self.open()
                 return await f(self, *args, **kwargs)
-    elif inspect.isasyncgenfunction(f):
-        async def wrapper(self, *args, **kwargs):
-            async with self._lock:
-                if self.auto_reconnect and not self.connected:
-                    await self.open()
-                async_gen = f(self, *args, **kwargs)
-            async for line in async_gen:
-                yield line
-    return functools.wraps(f)(wrapper)
+        return wrapper
+    return f

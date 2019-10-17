@@ -15,6 +15,9 @@ TESTING = any(x in sys.argv for x in ["test", "pytest"])
 
 setup_requirements = []
 if TESTING:
+    if sys.version_info < (3, 7):
+        print('testing sockio needs python >= 3.7')
+        exit(1)
     setup_requirements += ['pytest-runner']
 test_requirements = ['pytest', 'pytest-cov', 'pytest-asyncio']
 
