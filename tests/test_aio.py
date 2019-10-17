@@ -1,5 +1,8 @@
-import asyncio
+import os
+import sys
 import inspect
+import subprocess
+import asyncio.subprocess
 
 import pytest
 
@@ -215,3 +218,14 @@ async def test_read(aio_sock):
             reply += await coro
             n += 1
         assert expected == reply
+
+
+@pytest.mark.skipif(os.environ.get('CONDA_SHLVL', '0') != '0', reason='Inside conda environment')
+async def test_cli(aio_server):
+    _, port = aio_server.sockets[0].getsockname()
+    proc = await asyncio.create_subprocess_exec(
+        sys.executable, '-m', 'sockio.aio', '--port', str(port),
+        stdout=asyncio.subprocess.PIPE)
+    await proc.wait()
+    result = await proc.stdout.readline()
+    assert result == IDN_REP
