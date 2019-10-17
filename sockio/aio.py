@@ -5,9 +5,10 @@ import functools
 def ensure_connection(f):
     @functools.wraps(f)
     async def wrapper(self, *args, **kwargs):
-        if self.auto_reconnect and not self.connected:
-            await self.open()
-        return await f(self, *args, **kwargs)
+        async with self._lock:
+            if self.auto_reconnect and not self.connected:
+                await self.open()
+            return await f(self, *args, **kwargs)
     return wrapper
 
 
@@ -16,9 +17,10 @@ class Socket:
     def __init__(self, host, port, auto_reconnect=True):
         self.host = host
         self.port = port
+        self.auto_reconnect = auto_reconnect
         self._reader = None
         self._writer = None
-        self.auto_reconnect = auto_reconnect
+        self._lock = asyncio.Lock()
 
     async def open(self):
         if self.connected:
