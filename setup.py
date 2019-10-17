@@ -37,6 +37,7 @@ setup(
     description="Concurrency agnostic socket API",
     license="MIT license",
     long_description=description,
+    long_description_content_type='text/markdown',
     keywords='socket, asyncio',
     packages=find_packages(include=['sockio']),
     setup_requires=setup_requirements,
