@@ -1,5 +1,7 @@
 # sockio
 
+![Pypi version][pypi]
+
 A concurrency agnostic socket library on python.
 
 So far implemented REQ-REP semantics with auto-reconnection facilites.
@@ -55,7 +57,6 @@ reply = sock.write_readline(b'*IDN?\n').result()
 print(reply)
 ```
 
-
 ## Features
 
 ### Auto-reconnection
@@ -86,9 +87,4 @@ Join the party by bringing your own concurrency library with a PR!
 I am looking in particular for implementations over trio and curio.
 
 
-
-
-
-
-
-
+[pypi]: https://img.shields.io/pypi/pyversions/sockio.svg
