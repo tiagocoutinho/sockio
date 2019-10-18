@@ -12,16 +12,17 @@ async def run(options):
         try:
             while True:
                 data = await reader.readline()
-                logging.debug('recv %r', data)
                 if data.lower() == IDN_REQ:
                     msg = IDN_REP
                 elif not data:
                     logging.info('client %s disconnected', addr)
+                    return
                 else:
                     msg = WRONG_REP
-                logging.debug('send %r', msg)
+                logging.debug('recv %r', data)
                 writer.write(msg)
                 await writer.drain()
+                logging.debug('send %r', msg)
         except Exception:
             pass
 
