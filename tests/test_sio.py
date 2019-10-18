@@ -73,6 +73,72 @@ def test_open_close(sio_server, sio_sock):
     assert sio_sock.connection_counter == 2
 
 
+@pytest.mark.asyncio
+async def test_callbacks(sio_server):
+    host, port = sio_server.sockets[0].getsockname()
+    state = dict(made=0, lost=0, eof=0)
+
+    def made(transport):
+        state['made'] += 1
+
+    def lost(exc):
+        state['lost'] += 1
+
+    def eof():
+        state['eof'] += 1
+
+    sio_sock = Socket(host, port, on_connection_made=made,
+                      on_connection_lost=lost, on_eof_received=eof)
+    assert not sio_sock.connected
+    assert sio_sock.connection_counter == 0
+    assert state['made'] == 0
+    assert state['lost'] == 0
+    assert state['eof'] == 0
+
+    sio_sock.open()
+    assert sio_sock.connected
+    assert sio_sock.connection_counter == 1
+    assert state['made'] == 1
+    assert state['lost'] == 0
+    assert state['eof'] == 0
+
+    with pytest.raises(ConnectionError):
+        sio_sock.open()
+    assert sio_sock.connected
+    assert sio_sock.connection_counter == 1
+    assert state['made'] == 1
+    assert state['lost'] == 0
+    assert state['eof'] == 0
+
+    sio_sock.close()
+    assert not sio_sock.connected
+    assert sio_sock.connection_counter == 1
+    assert state['made'] == 1
+    assert state['lost'] == 1
+    assert state['eof'] == 0
+
+    sio_sock.open()
+    assert sio_sock.connected
+    assert sio_sock.connection_counter == 2
+    assert state['made'] == 2
+    assert state['lost'] == 1
+    assert state['eof'] == 0
+
+    sio_sock.close()
+    assert not sio_sock.connected
+    assert sio_sock.connection_counter == 2
+    assert state['made'] == 2
+    assert state['lost'] == 2
+    assert state['eof'] == 0
+
+    sio_sock.close()
+    assert not sio_sock.connected
+    assert sio_sock.connection_counter == 2
+    assert state['made'] == 2
+    assert state['lost'] == 2
+    assert state['eof'] == 0
+
+
 def test_write_readline(sio_sock):
     for request, expected in [(IDN_REQ,  IDN_REP),
                               (WRONG_REQ,  WRONG_REP)]:

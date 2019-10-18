@@ -14,7 +14,7 @@ class log_args:
         return args if len(args) < 80 else args[:74] + '[...]\''
 
 
-def log(f):
+def with_log(f):
     name = f.__name__
     if asyncio.iscoroutinefunction(f):
         @functools.wraps(f)

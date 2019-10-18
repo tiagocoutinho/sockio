@@ -25,7 +25,7 @@ def server_coro():
                 await asyncio.sleep(0.002)
                 writer.write(msg)
                 await writer.drain()
-        except:
+        except Exception:
             pass
 
     return asyncio.start_server(cb, host='0')
@@ -34,9 +34,11 @@ def server_coro():
 @pytest.fixture()
 async def aio_server():
     server = await server_coro()
-    task = asyncio.create_task(server.serve_forever())
+    asyncio.create_task(server.serve_forever())
     yield server
     server.close()
+    await server.wait_closed()
+    assert not server.is_serving()
 
 
 @pytest.fixture
