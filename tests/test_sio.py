@@ -1,6 +1,6 @@
 import pytest
 
-from sockio.sio import Socket
+from sockio.sio import Socket, main
 
 from conftest import IDN_REQ, IDN_REP, WRONG_REQ, WRONG_REP
 
@@ -242,3 +242,11 @@ def test_read(sio_sock):
             reply += sio_sock.read(1024)
             n += 1
         assert expected == reply
+
+
+@pytest.mark.skip('would block')
+def test_cli(aio_server, capsys):
+    _, port = aio_server.sockets[0].getsockname()
+    main(['--port', str(port)])
+    captured = capsys.readouterr()
+    assert captured.out == repr(IDN_REP) + '\n'

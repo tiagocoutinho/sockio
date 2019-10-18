@@ -5,7 +5,7 @@ import asyncio.subprocess
 
 import pytest
 
-from sockio.aio import Socket
+from sockio.aio import Socket, main
 
 from conftest import IDN_REQ, IDN_REP, WRONG_REQ, WRONG_REP
 
@@ -326,12 +326,10 @@ async def test_read(aio_sock):
         assert expected == reply
 
 
-@pytest.mark.skipif(os.environ.get('CONDA_SHLVL', '0') != '0', reason='Inside conda environment')
-async def test_cli(aio_server):
+#@pytest.mark.skipif(os.environ.get('CONDA_SHLVL', '0') != '0', reason='Inside conda environment')
+@pytest.mark.asyncio
+async def test_cli(aio_server, capsys):
     _, port = aio_server.sockets[0].getsockname()
-    proc = await asyncio.create_subprocess_exec(
-        sys.executable, '-m', 'sockio.aio', '--port', str(port),
-        stdout=asyncio.subprocess.PIPE)
-    await proc.wait()
-    result = await proc.stdout.readline()
-    assert result == IDN_REP
+    await main(['--port', str(port)])
+    captured = capsys.readouterr()
+    assert captured.out == repr(IDN_REP) + '\n'

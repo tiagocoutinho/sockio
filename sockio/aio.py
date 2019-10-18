@@ -168,18 +168,7 @@ class Socket:
         return result
 
 
-def app(options):
-    async def run():
-        sock = Socket(options.host, options.port)
-        request = options.request
-        nb_lines = request.count('\n')
-        lines = await sock.write_readlines(request.encode(), nb_lines)
-        for line in lines:
-            print(line)
-    asyncio.run(run(), debug=options.debug)
-
-
-def main(cb, args=None):
+def parse_args(args=None):
     import argparse
     parser = argparse.ArgumentParser()
     log_level_choices = ["critical", "error", "warning", "info", "debug"]
@@ -197,8 +186,22 @@ def main(cb, args=None):
         options.request += '\n'
     fmt = '%(asctime)-15s %(levelname)-5s %(threadName)s %(name)s: %(message)s'
     logging.basicConfig(level=options.log_level.upper(), format=fmt)
-    cb(options)
+    return options
+
+
+async def run(options):
+    sock = Socket(options.host, options.port)
+    request = options.request
+    nb_lines = request.count('\n')
+    lines = await sock.write_readlines(request.encode(), nb_lines)
+    for line in lines:
+        print(line)
+
+
+def main(args=None):
+    options = parse_args(args=args)
+    return run(options)
 
 
 if __name__ == '__main__':
-    main(app)
+    asyncio.run(main())

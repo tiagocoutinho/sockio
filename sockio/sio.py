@@ -104,7 +104,7 @@ DefaultEventLoop = EventLoop()
 Socket = DefaultEventLoop.socket
 
 
-def app(options):
+def run(options):
     DefaultEventLoop.set_debug(options.debug)
     sock = Socket(options.host, options.port)
     request = options.request
@@ -113,6 +113,11 @@ def app(options):
         print(r)
 
 
+def main(args=None):
+    from .aio import parse_args
+    options = parse_args(args=args)
+    run(options)
+
+
 if __name__ == '__main__':
-    from .aio import main
-    main(app)
+    main()
