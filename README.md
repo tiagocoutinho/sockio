@@ -4,6 +4,8 @@
 
 A concurrency agnostic socket library on python.
 
+![spec in action](./demo.svg)
+
 So far implemented REQ-REP semantics with auto-reconnection facilites.
 
 Implementations for:
