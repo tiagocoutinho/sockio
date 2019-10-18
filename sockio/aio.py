@@ -11,8 +11,8 @@ class Socket:
         self.port = port
         self.auto_reconnect = auto_reconnect
         self.connection_counter = 0
-        self._reader = None
-        self._writer = None
+        self.reader = None
+        self.writer = None
         self._log = logging.getLogger('sockio.Socket({}:{})'.format(host, port))
         self._lock = asyncio.Lock()
 
@@ -21,80 +21,80 @@ class Socket:
         if self.connected:
             raise ConnectionError('socket already open. must close it first')
         self._log.debug('open connection (#%d)', self.connection_counter + 1)
-        self._reader, self._writer = await asyncio.open_connection(
+        self.reader, self.writer = await asyncio.open_connection(
             self.host, self.port)
         self.connection_counter += 1
 
     @log
     async def close(self):
-        if self._writer is not None:
-            self._writer.close()
-            await self._writer.wait_closed()
-        self._reader = None
-        self._writer = None
+        if self.writer is not None:
+            self.writer.close()
+            await self.writer.wait_closed()
+        self.reader = None
+        self.writer = None
 
     @property
     def connected(self):
-        if self._reader is None:
+        if self.reader is None:
             return False
-        eof = self._reader.at_eof()
+        eof = self.reader.at_eof()
         return not eof
 
     @log
     @ensure_connection
     async def read(self, n=-1):
-        return await self._reader.read(n)
+        return await self.reader.read(n)
 
     @log
     @ensure_connection
     async def readline(self):
-        return await self._reader.readline()
+        return await self.reader.readline()
 
     @log
     @ensure_connection
     async def readlines(self, n):
         result = []
-        async for i in range(n):
-            result.append(await self._reader.readline())
+        for i in range(n):
+            result.append(await self.reader.readline())
         return result
 
     @log
     @ensure_connection
     async def readexactly(self, n):
-        return await self._reader.readexactly(n)
+        return await self.reader.readexactly(n)
 
     @log
     @ensure_connection
     async def readuntil(self, separator=b'\n'):
-        return await self._reader.readuntil(separator)
+        return await self.reader.readuntil(separator)
 
     @log
     @ensure_connection
     async def write(self, data):
-        self._writer.write(data)
-        await self._writer.drain()
+        self.writer.write(data)
+        await self.writer.drain()
 
     @log
     @ensure_connection
     async def writelines(self, lines):
-        self._writer.writelines(lines)
-        await self._writer.drain()
+        self.writer.writelines(lines)
+        await self.writer.drain()
 
     @log
     @ensure_connection
     async def write_readline(self, data):
-        self._writer.write(data)
-        await self._writer.drain()
-        return await self._reader.readline()
+        self.writer.write(data)
+        await self.writer.drain()
+        return await self.reader.readline()
 
     @log
     @ensure_connection
     async def write_readlines(self, data, n):
-        self._writer.write(data)
-        await self._writer.drain()
+        self.writer.write(data)
+        await self.writer.drain()
         result = []
-        async for i in range(n):
-            result.append(await self._reader.readline())
+        for i in range(n):
+            result.append(await self.reader.readline())
         return result
 
     @log
@@ -102,11 +102,11 @@ class Socket:
     async def writelines_readlines(self, lines, n=None):
         if n is None:
             n = len(lines)
-        self._writer.writelines(lines)
-        await self._writer.drain()
+        self.writer.writelines(lines)
+        await self.writer.drain()
         result = []
-        async for i in range(n):
-            result.append(await self._reader.readline())
+        for i in range(n):
+            result.append(await self.reader.readline())
         return result
 
 

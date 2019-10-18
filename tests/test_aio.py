@@ -1,6 +1,5 @@
 import os
 import sys
-import inspect
 import subprocess
 import asyncio.subprocess
 
@@ -94,9 +93,9 @@ async def test_write_readline(aio_sock):
 async def test_write_readlines(aio_sock):
     for request, expected in [(IDN_REQ,  [IDN_REP]), (2*IDN_REQ,  2*[IDN_REP]),
                               (IDN_REQ + WRONG_REQ,  [IDN_REP, WRONG_REP])]:
-        async_gen = aio_sock.write_readlines(request, len(expected))
-        assert inspect.isasyncgen(async_gen)
-        reply = [line async for line in async_gen]
+        coro = aio_sock.write_readlines(request, len(expected))
+        assert asyncio.iscoroutine(coro)
+        reply = await coro
         assert aio_sock.connected
         assert aio_sock.connection_counter == 1
         assert expected == reply
@@ -106,9 +105,9 @@ async def test_write_readlines(aio_sock):
 async def test_writelines_readlines(aio_sock):
     for request, expected in [([IDN_REQ],  [IDN_REP]), (2*[IDN_REQ],  2*[IDN_REP]),
                               ([IDN_REQ, WRONG_REQ],  [IDN_REP, WRONG_REP])]:
-        async_gen = aio_sock.writelines_readlines(request)
-        assert inspect.isasyncgen(async_gen)
-        reply = [line async for line in async_gen]
+        coro = aio_sock.writelines_readlines(request)
+        assert asyncio.iscoroutine(coro)
+        reply = await coro
         assert aio_sock.connected
         assert aio_sock.connection_counter == 1
         assert expected == reply
@@ -125,9 +124,9 @@ async def test_writelines(aio_sock):
         assert aio_sock.connection_counter == 1
         assert answer is None
 
-        async_gen = aio_sock.readlines(len(expected))
-        assert inspect.isasyncgen(async_gen)
-        reply = [line async for line in async_gen]
+        coro = aio_sock.readlines(len(expected))
+        assert asyncio.iscoroutine(coro)
+        reply = await coro
         assert aio_sock.connected
         assert aio_sock.connection_counter == 1
         assert expected == reply
@@ -195,9 +194,9 @@ async def test_readlines(aio_sock):
         assert aio_sock.connected
         assert aio_sock.connection_counter == 1
         assert answer is None
-        async_gen = aio_sock.readlines(len(expected))
-        assert inspect.isasyncgen(async_gen)
-        reply = [line async for line in async_gen]
+        coro = aio_sock.readlines(len(expected))
+        assert asyncio.iscoroutine(coro)
+        reply = await coro
         assert expected == reply
 
 
