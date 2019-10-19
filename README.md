@@ -6,7 +6,7 @@ A python concurrency agnostic socket library.
 
 ![spec in action](./demo.svg)
 
-Helpful when handling with instrumentation which works over TCP and implement
+Helpful when handling with instrumentation which work over TCP and implement
 simple REQ-REP communication protocols (example:
 [SCPI](https://en.m.wikipedia.org/wiki/Standard_Commands_for_Programmable_Instruments)).
 
