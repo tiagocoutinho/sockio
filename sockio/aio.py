@@ -71,6 +71,16 @@ class Socket:
         self._log = log.getChild('Socket({}:{})'.format(host, port))
         self._lock = asyncio.Lock()
 
+    def __aiter__(self):
+        return self
+
+    @ensure_connection
+    async def __anext__(self):
+        val = await self.reader.readline()
+        if val == b'':
+            raise StopAsyncIteration
+        return val
+
     @with_log
     async def open(self):
         if self.connected:

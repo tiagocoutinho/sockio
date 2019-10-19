@@ -1,31 +1,22 @@
 import asyncio
 import logging
 
-IDN_REQ, IDN_REP = b'*idn?\n', b'ACME, bla ble ble, 1234, 5678\n'
-WRONG_REQ, WRONG_REP = b'wrong question\n', b'ERROR: unknown command\n'
-
 
 async def run(options):
     async def cb(reader, writer):
         addr = writer.transport.get_extra_info('peername')
         logging.info('client connected from %s', addr)
         try:
-            while True:
-                data = await reader.readline()
-                if data.lower() == IDN_REQ:
-                    msg = IDN_REP
-                elif not data:
-                    logging.info('client %s disconnected', addr)
-                    return
-                else:
-                    msg = WRONG_REP
-                logging.debug('recv %r', data)
-                writer.write(msg)
+            for i in range(10):
+                msg = f'message {i}\n'
+                writer.write(msg.encode())
                 await writer.drain()
                 logging.debug('send %r', msg)
-        except Exception:
+                await asyncio.sleep(1)
             writer.close()
             await writer.wait_closed()
+        except Exception:
+            pass
 
     server = await asyncio.start_server(
         cb, host=options.host, port=options.port)

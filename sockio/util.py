@@ -44,5 +44,6 @@ def ensure_connection(f):
                 if self.auto_reconnect and not self.connected:
                     await self.open()
                 return await f(self, *args, **kwargs)
-        return wrapper
-    return f
+    else:
+        wrapper = f
+    return wrapper
