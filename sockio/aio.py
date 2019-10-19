@@ -41,12 +41,34 @@ class StreamReaderProtocol(asyncio.StreamReaderProtocol):
                 'Error in %s callback %r', name, callback.__name__)
 
 
+class StreamReader(asyncio.StreamReader):
+
+    async def readline(self, eol=b'\n'):
+        # This implementation is a copy of the asyncio.StreamReader.readline()
+        # with the purpose of supporting different EOL characters.
+        # we walk on thin ice here: we rely on the internal _buffer and
+        # _maybe_resume_transport members
+        seplen = len(eol)
+        try:
+            line = await self.readuntil(eol)
+        except asyncio.IncompleteReadError as e:
+            return e.partial
+        except asyncio.LimitOverrunError as e:
+            if self._buffer.startswith(eol, e.consumed):
+                del self._buffer[:e.consumed + seplen]
+            else:
+                self._buffer.clear()
+            self._maybe_resume_transport()
+            raise ValueError(e.args[0])
+        return line
+
+
 async def open_connection(host=None, port=None, loop=None, flags=0,
                           on_connection_made=None, on_connection_lost=None,
                           on_eof_received=None):
     if loop is None:
         loop = asyncio.get_event_loop()
-    reader = asyncio.StreamReader(loop=loop)
+    reader = StreamReader(loop=loop)
     protocol = StreamReaderProtocol(reader, loop=loop)
     protocol.connection_made_cb = on_connection_made
     protocol.connection_lost_cb = on_connection_lost
@@ -59,11 +81,12 @@ async def open_connection(host=None, port=None, loop=None, flags=0,
 
 class Socket:
 
-    def __init__(self, host, port, auto_reconnect=True,
+    def __init__(self, host, port, eol=b'\n', auto_reconnect=True,
                  on_connection_made=None, on_connection_lost=None,
                  on_eof_received=None):
         self.host = host
         self.port = port
+        self.eol = eol
         self.auto_reconnect = auto_reconnect
         self.connection_counter = 0
         self.on_connection_made = on_connection_made
@@ -119,15 +142,19 @@ class Socket:
 
     @with_log
     @ensure_connection
-    async def readline(self):
-        return await self.reader.readline()
+    async def readline(self, eol=None):
+        if eol is None:
+            eol = self.eol
+        return await self.reader.readline(eol=eol)
 
     @with_log
     @ensure_connection
-    async def readlines(self, n):
+    async def readlines(self, n, eol=None):
+        if eol is None:
+            eol = self.eol
         result = []
         for i in range(n):
-            result.append(await self.reader.readline())
+            result.append(await self.reader.readline(eol=eol))
         return result
 
     @with_log
@@ -154,31 +181,37 @@ class Socket:
 
     @with_log
     @ensure_connection
-    async def write_readline(self, data):
+    async def write_readline(self, data, eol=None):
+        if eol is None:
+            eol = self.eol
         self.writer.write(data)
         await self.writer.drain()
-        return await self.reader.readline()
+        return await self.reader.readline(eol=eol)
 
     @with_log
     @ensure_connection
-    async def write_readlines(self, data, n):
+    async def write_readlines(self, data, n, eol=None):
+        if eol is None:
+            eol = self.eol
         self.writer.write(data)
         await self.writer.drain()
         result = []
         for i in range(n):
-            result.append(await self.reader.readline())
+            result.append(await self.reader.readline(eol=eol))
         return result
 
     @with_log
     @ensure_connection
-    async def writelines_readlines(self, lines, n=None):
+    async def writelines_readlines(self, lines, n=None, eol=None):
         if n is None:
             n = len(lines)
+        if eol is None:
+            eol = self.eol
         self.writer.writelines(lines)
         await self.writer.drain()
         result = []
         for i in range(n):
-            result.append(await self.reader.readline())
+            result.append(await self.reader.readline(eol=eol))
         return result
 
 
