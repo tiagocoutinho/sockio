@@ -1,8 +1,11 @@
+import sys
 import asyncio
 import logging
 
-
 from .util import with_log, ensure_connection
+
+
+PY_37 = sys.version_info >= (3, 7)
 
 
 log = logging.getLogger('sockio')
@@ -97,7 +100,8 @@ class Socket:
     async def close(self):
         if self.writer is not None:
             self.writer.close()
-            await self.writer.wait_closed()
+            if PY_37:
+                await self.writer.wait_closed()
         self.reader = None
         self.writer = None
 

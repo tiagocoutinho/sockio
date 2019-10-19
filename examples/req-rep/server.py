@@ -1,8 +1,12 @@
+import sys
 import asyncio
 import logging
 
 IDN_REQ, IDN_REP = b'*idn?\n', b'ACME, bla ble ble, 1234, 5678\n'
 WRONG_REQ, WRONG_REP = b'wrong question\n', b'ERROR: unknown command\n'
+
+
+PY_37 = sys.version_info >= (3, 7)
 
 
 async def run(options):
@@ -25,7 +29,8 @@ async def run(options):
                 logging.debug('send %r', msg)
         except Exception:
             writer.close()
-            await writer.wait_closed()
+            if PY_37:
+                await writer.wait_closed()
 
     server = await asyncio.start_server(
         cb, host=options.host, port=options.port)
@@ -50,7 +55,12 @@ def main(args=None):
     fmt = '%(asctime)-15s %(levelname)-5s: %(message)s'
     logging.basicConfig(level=options.log_level.upper(), format=fmt)
     try:
-        asyncio.run(run(options))
+        coro = run(options)
+        if hasattr(asyncio, 'run'):
+            asyncio.run(coro)
+        else:
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(coro)
     except KeyboardInterrupt:
         logging.info('Ctrl-C pressed. Bailing out!')
 

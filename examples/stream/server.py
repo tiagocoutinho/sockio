@@ -1,5 +1,9 @@
+import sys
 import asyncio
 import logging
+
+
+PY_37 = sys.version_info >= (3, 7)
 
 
 async def run(options):
@@ -14,7 +18,8 @@ async def run(options):
                 logging.debug('send %r', msg)
                 await asyncio.sleep(1)
             writer.close()
-            await writer.wait_closed()
+            if PY_37:
+                await writer.wait_closed()
         except Exception:
             pass
 
@@ -41,7 +46,12 @@ def main(args=None):
     fmt = '%(asctime)-15s %(levelname)-5s: %(message)s'
     logging.basicConfig(level=options.log_level.upper(), format=fmt)
     try:
-        asyncio.run(run(options))
+        coro = run(options)
+        if hasattr(asyncio, 'run'):
+            asyncio.run(coro)
+        else:
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(coro)
     except KeyboardInterrupt:
         logging.info('Ctrl-C pressed. Bailing out!')
 

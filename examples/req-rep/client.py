@@ -25,6 +25,10 @@ fmt = '%(asctime)-15s %(levelname)-5s %(name)s: %(message)s'
 logging.basicConfig(format=fmt)
 
 try:
-    asyncio.run(main())
+    if hasattr(asyncio, 'run'):
+        asyncio.run(main())
+    else:
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(main())
 except KeyboardInterrupt:
     print('Ctrl-C pressed. Bailing out!')
