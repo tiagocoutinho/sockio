@@ -48,14 +48,13 @@ class StreamReader(asyncio.StreamReader):
         # with the purpose of supporting different EOL characters.
         # we walk on thin ice here: we rely on the internal _buffer and
         # _maybe_resume_transport members
-        seplen = len(eol)
         try:
             line = await self.readuntil(eol)
         except asyncio.IncompleteReadError as e:
             return e.partial
         except asyncio.LimitOverrunError as e:
             if self._buffer.startswith(eol, e.consumed):
-                del self._buffer[:e.consumed + seplen]
+                del self._buffer[:e.consumed + len(eol)]
             else:
                 self._buffer.clear()
             self._maybe_resume_transport()

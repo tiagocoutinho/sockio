@@ -39,13 +39,8 @@ class EventLoop(threading.Thread):
         self.loop.call_soon_threadsafe(self.loop.stop)
 
     @ensure_running
-    def call_soon(self, func, *args, **kwargs):
-        f = functools.partial(func, *args, **kwargs)
-        return self.loop.call_soon_threadsafe(f)
-
-    @ensure_running
     def run_coroutine(self, coro):
-         return asyncio.run_coroutine_threadsafe(coro, self.loop)
+        return asyncio.run_coroutine_threadsafe(coro, self.loop)
 
     def _create_coroutine_threadsafe(self, corof, resolve_future):
         @functools.wraps(corof)
@@ -54,14 +49,6 @@ class EventLoop(threading.Thread):
             future = self.run_coroutine(coro)
             return future.result() if resolve_future else future
         return wrapper
-
-    def _create_asyncgenerator_threadsafe(self, async_genf, resolve_future):
-        async def corof(*args, **kwargs):
-            result = []
-            async for item in async_genf(*args, **kwargs):
-                result.append(await item)
-            return result
-        return self._create_coroutine_threadsafe(corof, resolve_future)
 
     def _create_proxy_for(self, klass, resolve_futures=True):
         class Proxy(BaseProxy):
@@ -96,16 +83,13 @@ class EventLoop(threading.Thread):
                           on_eof_received=on_eof_received)
         return self.proxy(sock, resolve_futures)
 
-    def set_debug(self, debug):
-        self.loop.set_debug(debug)
-
 
 DefaultEventLoop = EventLoop()
 Socket = DefaultEventLoop.socket
 
 
 def run(options):
-    DefaultEventLoop.set_debug(options.debug)
+    DefaultEventLoop.loop.set_debug(options.debug)
     sock = Socket(options.host, options.port)
     request = options.request
     lines = request.count('\n')
