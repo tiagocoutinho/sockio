@@ -144,9 +144,120 @@ async def test_callbacks(aio_server):
     assert state['lost'] == 2
     assert state['eof'] == 0
 
+@pytest.mark.asyncio
+async def test_coroutine_callbacks(aio_server):
+    host, port = aio_server.sockets[0].getsockname()
+
+    state = dict(made=0, lost=0, eof=0)
+
+    async def made(transport):
+        await asyncio.sleep(0.1)
+        state['made'] += 1
+
+    async def lost(exc):
+        await asyncio.sleep(0.1)
+        state['lost'] += 1
+
+    async def eof():
+        await asyncio.sleep(0.1)
+        state['eof'] += 1
+
+    aio_sock = Socket(host, port, on_connection_made=made,
+                      on_connection_lost=lost, on_eof_received=eof)
+
+    assert not aio_sock.connected
+    assert aio_sock.connection_counter == 0
+    assert state['made'] == 0
+    assert state['lost'] == 0
+    assert state['eof'] == 0
+
+    await aio_sock.open()
+    assert aio_sock.connected
+    assert aio_sock.connection_counter == 1
+    assert state['made'] == 0
+    assert state['lost'] == 0
+    assert state['eof'] == 0
+    await asyncio.sleep(0.11)
+    assert state['made'] == 1
+    assert state['lost'] == 0
+    assert state['eof'] == 0
+
+    with pytest.raises(ConnectionError):
+        await aio_sock.open()
+    assert aio_sock.connected
+    assert aio_sock.connection_counter == 1
+    assert state['made'] == 1
+    assert state['lost'] == 0
+    assert state['eof'] == 0
+
+    await aio_sock.close()
+    assert not aio_sock.connected
+    assert aio_sock.connection_counter == 1
+    assert state['made'] == 1
+    assert state['lost'] == 0
+    assert state['eof'] == 0
+    await asyncio.sleep(0.11)
+    assert state['made'] == 1
+    assert state['lost'] == 1
+    assert state['eof'] == 0
+
+    await aio_sock.open()
+    assert aio_sock.connected
+    assert aio_sock.connection_counter == 2
+    assert state['made'] == 1
+    assert state['lost'] == 1
+    assert state['eof'] == 0
+    await asyncio.sleep(0.11)
+    assert state['made'] == 2
+    assert state['lost'] == 1
+    assert state['eof'] == 0
+
+    await aio_sock.close()
+    assert not aio_sock.connected
+    assert aio_sock.connection_counter == 2
+    assert state['made'] == 2
+    assert state['lost'] == 1
+    assert state['eof'] == 0
+    await asyncio.sleep(0.11)
+    assert state['made'] == 2
+    assert state['lost'] == 2
+    assert state['eof'] == 0
+
+    await aio_sock.close()
+    assert not aio_sock.connected
+    assert aio_sock.connection_counter == 2
+    assert state['made'] == 2
+    assert state['lost'] == 2
+    assert state['eof'] == 0
+    await asyncio.sleep(0.11)
+    assert state['made'] == 2
+    assert state['lost'] == 2
+    assert state['eof'] == 0
+
+@pytest.mark.asyncio
+async def test_error_callback(aio_server):
+    host, port = aio_server.sockets[0].getsockname()
+
+    state = dict(made=0)
+
+    def error_callback(transport):
+        state['made'] += 1
+        raise RuntimeError('cannot handle this')
+
+    aio_sock = Socket(host, port, on_connection_made=error_callback)
+
+    assert not aio_sock.connected
+    assert aio_sock.connection_counter == 0
+    assert state['made'] == 0
+
+    await aio_sock.open()
+    assert aio_sock.connected
+    assert aio_sock.connection_counter == 1
+    assert state['made'] == 1
+
 
 @pytest.mark.skip('bug in python server.close() ?')
-#@pytest.mark.asyncio
+# @pytest.mark.asyncio
 async def test_eof_callback(aio_server):
     host, port = aio_server.sockets[0].getsockname()
     state = dict(made=0, lost=0, eof=0)
