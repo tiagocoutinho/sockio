@@ -437,7 +437,20 @@ async def test_read(aio_sock):
         assert expected == reply
 
 
-#@pytest.mark.skipif(os.environ.get('CONDA_SHLVL', '0') != '0', reason='Inside conda environment')
+@pytest.mark.asyncio
+async def test_stream(aio_sock):
+    request = b'data? 2\n'
+    await aio_sock.write(request)
+    i = 0
+    async for line in aio_sock:
+        assert line == b'1.2345 5.4321 12345.54321\n'
+        i += 1
+    assert i == 2
+    assert aio_sock.connection_counter == 1
+    assert not aio_sock.connected
+
+
+# @pytest.mark.skipif(os.environ.get('CONDA_SHLVL', '0') != '0', reason='Inside conda environment')
 @pytest.mark.asyncio
 async def test_cli(aio_server, capsys):
     _, port = aio_server.sockets[0].getsockname()

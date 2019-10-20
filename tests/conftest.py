@@ -12,20 +12,29 @@ WRONG_REQ, WRONG_REP = b'wrong question\n', b'ERROR: unknown command\n'
 
 
 def server_coro():
-    data = dict(nb_clients=0)
+
     async def cb(reader, writer):
         try:
             while True:
                 data = await reader.readline()
                 if data.lower() == IDN_REQ:
                     msg = IDN_REP
+                elif data.lower().startswith(b'data?'):
+                    n = int(data.strip().split(b' ', 1)[-1])
+                    for i in range(n):
+                        await asyncio.sleep(0.05)
+                        writer.write(b'1.2345 5.4321 12345.54321\n')
+                        await writer.drain()
+                    writer.close()
+                    await writer.wait_closed()
+                    return
                 else:
                     msg = WRONG_REP
                 # add 2ms delay
                 await asyncio.sleep(0.002)
                 writer.write(msg)
                 await writer.drain()
-        except Exception:
+        except ConnectionResetError:
             pass
 
     return asyncio.start_server(cb, host='0')
