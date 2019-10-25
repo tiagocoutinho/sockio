@@ -51,9 +51,9 @@ async def aio_server():
 
 
 @pytest.fixture
-async def aio_sock(aio_server):
+async def aio_tcp(aio_server):
     addr = aio_server.sockets[0].getsockname()
-    sock = sockio.aio.Socket(*addr)
+    sock = sockio.aio.TCP(*addr)
     yield sock
     await sock.close()
 
@@ -73,8 +73,8 @@ def sio_server():
 
 
 @pytest.fixture
-def sio_sock(sio_server):
+def sio_tcp(sio_server):
     addr = sio_server.sockets[0].getsockname()
-    sock = sockio.sio.Socket(*addr)
+    sock = sockio.sio.TCP(*addr)
     yield sock
     sock.close()

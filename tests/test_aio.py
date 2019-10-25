@@ -5,13 +5,13 @@ import asyncio.subprocess
 
 import pytest
 
-from sockio.aio import Socket, main
+from sockio.aio import TCP, main
 
 from conftest import IDN_REQ, IDN_REP, WRONG_REQ, WRONG_REP
 
 
 def test_socket_creation():
-    sock = Socket('example.com', 34567)
+    sock = TCP('example.com', 34567)
     assert sock.host == 'example.com'
     assert sock.port == 34567
     assert sock.auto_reconnect == True
@@ -20,7 +20,7 @@ def test_socket_creation():
 
 @pytest.mark.asyncio
 async def test_open_fail(unused_tcp_port):
-    sock = Socket('0', unused_tcp_port)
+    sock = TCP('0', unused_tcp_port)
     assert not sock.connected
     assert sock.connection_counter == 0
 
@@ -31,7 +31,7 @@ async def test_open_fail(unused_tcp_port):
 
 @pytest.mark.asyncio
 async def test_write_fail(unused_tcp_port):
-    sock = Socket('0', unused_tcp_port)
+    sock = TCP('0', unused_tcp_port)
     assert not sock.connected
     assert sock.connection_counter == 0
 
@@ -42,7 +42,7 @@ async def test_write_fail(unused_tcp_port):
 
 @pytest.mark.asyncio
 async def test_write_readline_fail(unused_tcp_port):
-    sock = Socket('0', unused_tcp_port)
+    sock = TCP('0', unused_tcp_port)
     assert not sock.connected
     assert sock.connection_counter == 0
 
@@ -53,30 +53,30 @@ async def test_write_readline_fail(unused_tcp_port):
 
 
 @pytest.mark.asyncio
-async def test_open_close(aio_server, aio_sock):
-    assert not aio_sock.connected
-    assert aio_sock.connection_counter == 0
-    assert aio_server.sockets[0].getsockname() == (aio_sock.host, aio_sock.port)
+async def test_open_close(aio_server, aio_tcp):
+    assert not aio_tcp.connected
+    assert aio_tcp.connection_counter == 0
+    assert aio_server.sockets[0].getsockname() == (aio_tcp.host, aio_tcp.port)
 
-    await aio_sock.open()
-    assert aio_sock.connected
-    assert aio_sock.connection_counter == 1
+    await aio_tcp.open()
+    assert aio_tcp.connected
+    assert aio_tcp.connection_counter == 1
 
     with pytest.raises(ConnectionError):
-        await aio_sock.open()
-    assert aio_sock.connected
-    assert aio_sock.connection_counter == 1
+        await aio_tcp.open()
+    assert aio_tcp.connected
+    assert aio_tcp.connection_counter == 1
 
-    await aio_sock.close()
-    assert not aio_sock.connected
-    assert aio_sock.connection_counter == 1
-    await aio_sock.open()
-    assert aio_sock.connected
-    assert aio_sock.connection_counter == 2
-    await aio_sock.close()
-    await aio_sock.close()
-    assert not aio_sock.connected
-    assert aio_sock.connection_counter == 2
+    await aio_tcp.close()
+    assert not aio_tcp.connected
+    assert aio_tcp.connection_counter == 1
+    await aio_tcp.open()
+    assert aio_tcp.connected
+    assert aio_tcp.connection_counter == 2
+    await aio_tcp.close()
+    await aio_tcp.close()
+    assert not aio_tcp.connected
+    assert aio_tcp.connection_counter == 2
 
 
 @pytest.mark.asyncio
@@ -93,53 +93,53 @@ async def test_callbacks(aio_server):
     def eof():
         state['eof'] += 1
 
-    aio_sock = Socket(host, port, on_connection_made=made,
-                      on_connection_lost=lost, on_eof_received=eof)
-    assert not aio_sock.connected
-    assert aio_sock.connection_counter == 0
+    aio_tcp = TCP(host, port, on_connection_made=made,
+                  on_connection_lost=lost, on_eof_received=eof)
+    assert not aio_tcp.connected
+    assert aio_tcp.connection_counter == 0
     assert state['made'] == 0
     assert state['lost'] == 0
     assert state['eof'] == 0
 
-    await aio_sock.open()
-    assert aio_sock.connected
-    assert aio_sock.connection_counter == 1
+    await aio_tcp.open()
+    assert aio_tcp.connected
+    assert aio_tcp.connection_counter == 1
     assert state['made'] == 1
     assert state['lost'] == 0
     assert state['eof'] == 0
 
     with pytest.raises(ConnectionError):
-        await aio_sock.open()
-    assert aio_sock.connected
-    assert aio_sock.connection_counter == 1
+        await aio_tcp.open()
+    assert aio_tcp.connected
+    assert aio_tcp.connection_counter == 1
     assert state['made'] == 1
     assert state['lost'] == 0
     assert state['eof'] == 0
 
-    await aio_sock.close()
-    assert not aio_sock.connected
-    assert aio_sock.connection_counter == 1
+    await aio_tcp.close()
+    assert not aio_tcp.connected
+    assert aio_tcp.connection_counter == 1
     assert state['made'] == 1
     assert state['lost'] == 1
     assert state['eof'] == 0
 
-    await aio_sock.open()
-    assert aio_sock.connected
-    assert aio_sock.connection_counter == 2
+    await aio_tcp.open()
+    assert aio_tcp.connected
+    assert aio_tcp.connection_counter == 2
     assert state['made'] == 2
     assert state['lost'] == 1
     assert state['eof'] == 0
 
-    await aio_sock.close()
-    assert not aio_sock.connected
-    assert aio_sock.connection_counter == 2
+    await aio_tcp.close()
+    assert not aio_tcp.connected
+    assert aio_tcp.connection_counter == 2
     assert state['made'] == 2
     assert state['lost'] == 2
     assert state['eof'] == 0
 
-    await aio_sock.close()
-    assert not aio_sock.connected
-    assert aio_sock.connection_counter == 2
+    await aio_tcp.close()
+    assert not aio_tcp.connected
+    assert aio_tcp.connection_counter == 2
     assert state['made'] == 2
     assert state['lost'] == 2
     assert state['eof'] == 0
@@ -147,89 +147,89 @@ async def test_callbacks(aio_server):
 @pytest.mark.asyncio
 async def test_coroutine_callbacks(aio_server):
     host, port = aio_server.sockets[0].getsockname()
-
+    RESP_TIME = 0.02
     state = dict(made=0, lost=0, eof=0)
 
     async def made(transport):
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(RESP_TIME)
         state['made'] += 1
 
     async def lost(exc):
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(RESP_TIME)
         state['lost'] += 1
 
     async def eof():
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(RESP_TIME)
         state['eof'] += 1
 
-    aio_sock = Socket(host, port, on_connection_made=made,
-                      on_connection_lost=lost, on_eof_received=eof)
+    aio_tcp = TCP(host, port, on_connection_made=made,
+                  on_connection_lost=lost, on_eof_received=eof)
 
-    assert not aio_sock.connected
-    assert aio_sock.connection_counter == 0
+    assert not aio_tcp.connected
+    assert aio_tcp.connection_counter == 0
     assert state['made'] == 0
     assert state['lost'] == 0
     assert state['eof'] == 0
 
-    await aio_sock.open()
-    assert aio_sock.connected
-    assert aio_sock.connection_counter == 1
+    await aio_tcp.open()
+    assert aio_tcp.connected
+    assert aio_tcp.connection_counter == 1
     assert state['made'] == 0
     assert state['lost'] == 0
     assert state['eof'] == 0
-    await asyncio.sleep(0.11)
+    await asyncio.sleep(RESP_TIME + 0.01)
     assert state['made'] == 1
     assert state['lost'] == 0
     assert state['eof'] == 0
 
     with pytest.raises(ConnectionError):
-        await aio_sock.open()
-    assert aio_sock.connected
-    assert aio_sock.connection_counter == 1
+        await aio_tcp.open()
+    assert aio_tcp.connected
+    assert aio_tcp.connection_counter == 1
     assert state['made'] == 1
     assert state['lost'] == 0
     assert state['eof'] == 0
 
-    await aio_sock.close()
-    assert not aio_sock.connected
-    assert aio_sock.connection_counter == 1
+    await aio_tcp.close()
+    assert not aio_tcp.connected
+    assert aio_tcp.connection_counter == 1
     assert state['made'] == 1
     assert state['lost'] == 0
     assert state['eof'] == 0
-    await asyncio.sleep(0.11)
+    await asyncio.sleep(RESP_TIME + 0.01)
     assert state['made'] == 1
     assert state['lost'] == 1
     assert state['eof'] == 0
 
-    await aio_sock.open()
-    assert aio_sock.connected
-    assert aio_sock.connection_counter == 2
+    await aio_tcp.open()
+    assert aio_tcp.connected
+    assert aio_tcp.connection_counter == 2
     assert state['made'] == 1
     assert state['lost'] == 1
     assert state['eof'] == 0
-    await asyncio.sleep(0.11)
+    await asyncio.sleep(RESP_TIME + 0.01)
     assert state['made'] == 2
     assert state['lost'] == 1
     assert state['eof'] == 0
 
-    await aio_sock.close()
-    assert not aio_sock.connected
-    assert aio_sock.connection_counter == 2
+    await aio_tcp.close()
+    assert not aio_tcp.connected
+    assert aio_tcp.connection_counter == 2
     assert state['made'] == 2
     assert state['lost'] == 1
     assert state['eof'] == 0
-    await asyncio.sleep(0.11)
+    await asyncio.sleep(RESP_TIME + 0.01)
     assert state['made'] == 2
     assert state['lost'] == 2
     assert state['eof'] == 0
 
-    await aio_sock.close()
-    assert not aio_sock.connected
-    assert aio_sock.connection_counter == 2
+    await aio_tcp.close()
+    assert not aio_tcp.connected
+    assert aio_tcp.connection_counter == 2
     assert state['made'] == 2
     assert state['lost'] == 2
     assert state['eof'] == 0
-    await asyncio.sleep(0.11)
+    await asyncio.sleep(RESP_TIME + 0.01)
     assert state['made'] == 2
     assert state['lost'] == 2
     assert state['eof'] == 0
@@ -244,15 +244,15 @@ async def test_error_callback(aio_server):
         state['made'] += 1
         raise RuntimeError('cannot handle this')
 
-    aio_sock = Socket(host, port, on_connection_made=error_callback)
+    aio_tcp = TCP(host, port, on_connection_made=error_callback)
 
-    assert not aio_sock.connected
-    assert aio_sock.connection_counter == 0
+    assert not aio_tcp.connected
+    assert aio_tcp.connection_counter == 0
     assert state['made'] == 0
 
-    await aio_sock.open()
-    assert aio_sock.connected
-    assert aio_sock.connection_counter == 1
+    await aio_tcp.open()
+    assert aio_tcp.connected
+    assert aio_tcp.connection_counter == 1
     assert state['made'] == 1
 
 
@@ -271,17 +271,17 @@ async def test_eof_callback(aio_server):
     def eof():
         state['eof'] += 1
 
-    aio_sock = Socket(host, port, on_connection_made=made,
-                      on_connection_lost=lost, on_eof_received=eof)
-    assert not aio_sock.connected
-    assert aio_sock.connection_counter == 0
+    aio_tcp = TCP(host, port, on_connection_made=made,
+                  on_connection_lost=lost, on_eof_received=eof)
+    assert not aio_tcp.connected
+    assert aio_tcp.connection_counter == 0
     assert state['made'] == 0
     assert state['lost'] == 0
     assert state['eof'] == 0
 
-    await aio_sock.open()
-    assert aio_sock.connected
-    assert aio_sock.connection_counter == 1
+    await aio_tcp.open()
+    assert aio_tcp.connected
+    assert aio_tcp.connection_counter == 1
     assert state['made'] == 1
     assert state['lost'] == 0
     assert state['eof'] == 0
@@ -296,141 +296,141 @@ async def test_eof_callback(aio_server):
 
 
 @pytest.mark.asyncio
-async def test_write_readline(aio_sock):
+async def test_write_readline(aio_tcp):
     for request, expected in [(IDN_REQ,  IDN_REP),
                               (WRONG_REQ,  WRONG_REP)]:
-        coro = aio_sock.write_readline(request)
+        coro = aio_tcp.write_readline(request)
         assert asyncio.iscoroutine(coro)
         reply = await coro
-        assert aio_sock.connected
-        assert aio_sock.connection_counter == 1
+        assert aio_tcp.connected
+        assert aio_tcp.connection_counter == 1
         assert expected == reply
 
 
 @pytest.mark.asyncio
-async def test_write_readlines(aio_sock):
+async def test_write_readlines(aio_tcp):
     for request, expected in [(IDN_REQ,  [IDN_REP]), (2*IDN_REQ,  2*[IDN_REP]),
                               (IDN_REQ + WRONG_REQ,  [IDN_REP, WRONG_REP])]:
-        coro = aio_sock.write_readlines(request, len(expected))
+        coro = aio_tcp.write_readlines(request, len(expected))
         assert asyncio.iscoroutine(coro)
         reply = await coro
-        assert aio_sock.connected
-        assert aio_sock.connection_counter == 1
+        assert aio_tcp.connected
+        assert aio_tcp.connection_counter == 1
         assert expected == reply
 
 
 @pytest.mark.asyncio
-async def test_writelines_readlines(aio_sock):
+async def test_writelines_readlines(aio_tcp):
     for request, expected in [([IDN_REQ],  [IDN_REP]), (2*[IDN_REQ],  2*[IDN_REP]),
                               ([IDN_REQ, WRONG_REQ],  [IDN_REP, WRONG_REP])]:
-        coro = aio_sock.writelines_readlines(request)
+        coro = aio_tcp.writelines_readlines(request)
         assert asyncio.iscoroutine(coro)
         reply = await coro
-        assert aio_sock.connected
-        assert aio_sock.connection_counter == 1
+        assert aio_tcp.connected
+        assert aio_tcp.connection_counter == 1
         assert expected == reply
 
 
 @pytest.mark.asyncio
-async def test_writelines(aio_sock):
+async def test_writelines(aio_tcp):
     for request, expected in [([IDN_REQ],  [IDN_REP]), (2*[IDN_REQ],  2*[IDN_REP]),
                               ([IDN_REQ, WRONG_REQ],  [IDN_REP, WRONG_REP])]:
-        coro = aio_sock.writelines(request)
+        coro = aio_tcp.writelines(request)
         assert asyncio.iscoroutine(coro)
         answer = await coro
-        assert aio_sock.connected
-        assert aio_sock.connection_counter == 1
+        assert aio_tcp.connected
+        assert aio_tcp.connection_counter == 1
         assert answer is None
 
-        coro = aio_sock.readlines(len(expected))
+        coro = aio_tcp.readlines(len(expected))
         assert asyncio.iscoroutine(coro)
         reply = await coro
-        assert aio_sock.connected
-        assert aio_sock.connection_counter == 1
+        assert aio_tcp.connected
+        assert aio_tcp.connection_counter == 1
         assert expected == reply
 
 
 @pytest.mark.asyncio
-async def test_readline(aio_sock):
+async def test_readline(aio_tcp):
     for request, expected in [(IDN_REQ,  IDN_REP),
                               (WRONG_REQ,  WRONG_REP)]:
-        coro = aio_sock.write(request)
+        coro = aio_tcp.write(request)
         assert asyncio.iscoroutine(coro)
         answer = await coro
-        assert aio_sock.connected
-        assert aio_sock.connection_counter == 1
+        assert aio_tcp.connected
+        assert aio_tcp.connection_counter == 1
         assert answer is None
-        coro = aio_sock.readline()
-        assert asyncio.iscoroutine(coro)
-        reply = await coro
-        assert expected == reply
-
-
-@pytest.mark.asyncio
-async def test_readuntil(aio_sock):
-    for request, expected in [(IDN_REQ,  IDN_REP),
-                              (WRONG_REQ,  WRONG_REP)]:
-        coro = aio_sock.write(request)
-        assert asyncio.iscoroutine(coro)
-        answer = await coro
-        assert aio_sock.connected
-        assert aio_sock.connection_counter == 1
-        assert answer is None
-        coro = aio_sock.readuntil(b'\n')
+        coro = aio_tcp.readline()
         assert asyncio.iscoroutine(coro)
         reply = await coro
         assert expected == reply
 
 
 @pytest.mark.asyncio
-async def test_readexactly(aio_sock):
+async def test_readuntil(aio_tcp):
     for request, expected in [(IDN_REQ,  IDN_REP),
                               (WRONG_REQ,  WRONG_REP)]:
-        coro = aio_sock.write(request)
+        coro = aio_tcp.write(request)
         assert asyncio.iscoroutine(coro)
         answer = await coro
-        assert aio_sock.connected
-        assert aio_sock.connection_counter == 1
+        assert aio_tcp.connected
+        assert aio_tcp.connection_counter == 1
         assert answer is None
-        coro = aio_sock.readexactly(len(expected) - 5)
+        coro = aio_tcp.readuntil(b'\n')
+        assert asyncio.iscoroutine(coro)
+        reply = await coro
+        assert expected == reply
+
+
+@pytest.mark.asyncio
+async def test_readexactly(aio_tcp):
+    for request, expected in [(IDN_REQ,  IDN_REP),
+                              (WRONG_REQ,  WRONG_REP)]:
+        coro = aio_tcp.write(request)
+        assert asyncio.iscoroutine(coro)
+        answer = await coro
+        assert aio_tcp.connected
+        assert aio_tcp.connection_counter == 1
+        assert answer is None
+        coro = aio_tcp.readexactly(len(expected) - 5)
         assert asyncio.iscoroutine(coro)
         reply = await coro
         assert expected[:-5] == reply
-        coro = aio_sock.readexactly(5)
+        coro = aio_tcp.readexactly(5)
         assert asyncio.iscoroutine(coro)
         reply = await coro
         assert expected[-5:] == reply
 
 
 @pytest.mark.asyncio
-async def test_readlines(aio_sock):
+async def test_readlines(aio_tcp):
     for request, expected in [(IDN_REQ,  [IDN_REP]), (2*IDN_REQ,  2*[IDN_REP]),
                               (IDN_REQ + WRONG_REQ,  [IDN_REP, WRONG_REP])]:
-        coro = aio_sock.write(request)
+        coro = aio_tcp.write(request)
         assert asyncio.iscoroutine(coro)
         answer = await coro
-        assert aio_sock.connected
-        assert aio_sock.connection_counter == 1
+        assert aio_tcp.connected
+        assert aio_tcp.connection_counter == 1
         assert answer is None
-        coro = aio_sock.readlines(len(expected))
+        coro = aio_tcp.readlines(len(expected))
         assert asyncio.iscoroutine(coro)
         reply = await coro
         assert expected == reply
 
 
 @pytest.mark.asyncio
-async def test_read(aio_sock):
+async def test_read(aio_tcp):
     for request, expected in [(IDN_REQ,  IDN_REP),
                               (WRONG_REQ,  WRONG_REP)]:
-        coro = aio_sock.write(request)
+        coro = aio_tcp.write(request)
         assert asyncio.iscoroutine(coro)
         answer = await coro
-        assert aio_sock.connected
-        assert aio_sock.connection_counter == 1
+        assert aio_tcp.connected
+        assert aio_tcp.connection_counter == 1
         assert answer is None
         reply, n = b'', 0
         while len(reply) < len(expected) and n < 2:
-            coro = aio_sock.read(1024)
+            coro = aio_tcp.read(1024)
             assert asyncio.iscoroutine(coro)
             reply += await coro
             n += 1
@@ -438,16 +438,16 @@ async def test_read(aio_sock):
 
 
 @pytest.mark.asyncio
-async def test_stream(aio_sock):
+async def test_stream(aio_tcp):
     request = b'data? 2\n'
-    await aio_sock.write(request)
+    await aio_tcp.write(request)
     i = 0
-    async for line in aio_sock:
+    async for line in aio_tcp:
         assert line == b'1.2345 5.4321 12345.54321\n'
         i += 1
     assert i == 2
-    assert aio_sock.connection_counter == 1
-    assert not aio_sock.connected
+    assert aio_tcp.connection_counter == 1
+    assert not aio_tcp.connected
 
 
 # @pytest.mark.skipif(os.environ.get('CONDA_SHLVL', '0') != '0', reason='Inside conda environment')

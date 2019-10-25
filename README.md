@@ -32,10 +32,10 @@ pip install sockio
 
 ```python
 import asyncio
-from sockio.aio import Socket
+from sockio.aio import TCP
 
 async def main():
-    sock = Socket('acme.example.com', 5000)
+    sock = TCP('acme.example.com', 5000)
     # Assuming a SCPI complient on the other end we can ask for:
     reply = await sock.write_readline(b'*IDN?\n')
     print(reply)
@@ -46,9 +46,9 @@ asyncio.run(main())
 *classic*
 
 ```python
-from sockio.sio import Socket
+from sockio.sio import TCP
 
-sock = Socket('acme.example.com', 5000)
+sock = TCP('acme.example.com', 5000)
 reply = sock.write_readline(b'*IDN?\n')
 print(reply)
 ```
@@ -56,9 +56,9 @@ print(reply)
 *concurrent.futures*
 
 ```python
-from sockio.sio import Socket
+from sockio.sio import TCP
 
-sock = Socket('acme.example.com', 5000, resolve_futures=False)
+sock = TCP('acme.example.com', 5000, resolve_futures=False)
 reply = sock.write_readline(b'*IDN?\n').result()
 print(reply)
 ```
@@ -67,7 +67,7 @@ print(reply)
 
 ### REQ-REP semantics
 
-Many instruments out there have a Request-Reply protocol. A sockio Socket
+Many instruments out there have a Request-Reply protocol. A sockio TCP
 provides `write_read` family of methods which simplify communication with
 these instruments. These methods are atomic which means different tasks or
 threads can safely work with the same socket object (although I would
@@ -76,7 +76,7 @@ question myself why would I be doing that in my library/application).
 ### Auto-reconnection
 
 ```python
-sock = Socket('acme.example.com', 5000)
+sock = TCP('acme.example.com', 5000)
 reply = await sock.write_readline(b'*IDN?\n')
 print(reply)
 
@@ -95,10 +95,10 @@ equipment during the night (planet Earth thanks you for saving energy!).
 ### Custom EOL
 
 In line based protocols, sometimes people decide `\n` is not a good EOL character.
-A sockio Socket can be customized with a different EOL character. Example:
+A sockio TCP can be customized with a different EOL character. Example:
 
 ```python
-sock = Socket('acme.example.com', 5000, eol=b'\r')
+sock = TCP('acme.example.com', 5000, eol=b'\r')
 ```
 
 The EOL character can be overwritten in any of the `readline` methods. Example:
@@ -109,7 +109,7 @@ await sock.write_readline(b'*IDN?\n', eol=b'\r')
 ### Connection event callbacks
 
 You can be notified on `connection_made`, `connection_lost` and `eof_received` events
-by registering callbacks on the sockio Socket constructor
+by registering callbacks on the sockio TCP constructor
 
 This is particularly useful if, for example, you want a specific procedure to be
 executed every time the socket is reconnected to make sure your configuration is
@@ -120,18 +120,18 @@ async def connected():
     await sock.write(b'ACQU:TRIGGER HARDWARE\n')
     await sock.write(b'DISPLAY OFF\n')
 
-sock = Socket('acme.example.com', 5000, on_connection_made=connected)
+sock = TCP('acme.example.com', 5000, on_connection_made=connected)
 ```
 
 (see examples/req-rep/client.py)
 
 ### Streams
 
-sockio Sockets are asynchronous iterable objects. This means that line streaming
+sockio TCPs are asynchronous iterable objects. This means that line streaming
 is as easy as:
 
 ```python
-sock = Socket('acme.example.com', 5000, eol=b'\r')
+sock = TCP('acme.example.com', 5000, eol=b'\r')
 
 async for line in sock:
     print(line)

@@ -78,7 +78,7 @@ async def open_connection(host=None, port=None, loop=None, flags=0,
     return reader, writer
 
 
-class Socket:
+class TCP:
 
     def __init__(self, host, port, eol=b'\n', auto_reconnect=True,
                  on_connection_made=None, on_connection_lost=None,
@@ -93,7 +93,7 @@ class Socket:
         self.on_eof_received = on_eof_received
         self.reader = None
         self.writer = None
-        self._log = log.getChild('Socket({}:{})'.format(host, port))
+        self._log = log.getChild('TCP({}:{})'.format(host, port))
         self._lock = asyncio.Lock()
 
     def __aiter__(self):
@@ -236,7 +236,7 @@ def parse_args(args=None):
 
 
 async def run(options):
-    sock = Socket(options.host, options.port)
+    sock = TCP(options.host, options.port)
     request = options.request
     nb_lines = request.count('\n')
     lines = await sock.write_readlines(request.encode(), nb_lines)
