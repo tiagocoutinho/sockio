@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 """The setup script."""
@@ -38,7 +37,7 @@ setup(
         'Programming Language :: Python :: 3.7'
     ],
     description="Concurrency agnostic socket API",
-    license="MIT license",
+    license="GPLv3+",
     long_description=description,
     long_description_content_type='text/markdown',
     keywords='socket, asyncio',
