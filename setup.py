@@ -47,5 +47,6 @@ setup(
     tests_require=test_requirements,
     url='https://github.com/tiagocoutinho/sockio',
     version='0.3.0',
+    python_requires='>=3.5',
     zip_safe=True
 )
