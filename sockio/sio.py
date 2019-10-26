@@ -74,7 +74,7 @@ class EventLoop(threading.Thread):
         return Proxy(obj)
 
     @ensure_running
-    def socket(self, host, port, auto_reconnect=True,
+    def tcp(self, host, port, auto_reconnect=True,
                on_connection_made=None, on_connection_lost=None,
                on_eof_received=None, resolve_futures=True):
         sock = aio.TCP(host, port, auto_reconnect=auto_reconnect,
@@ -85,7 +85,7 @@ class EventLoop(threading.Thread):
 
 
 DefaultEventLoop = EventLoop()
-TCP = DefaultEventLoop.socket
+TCP = DefaultEventLoop.tcp
 
 
 def run(options):
