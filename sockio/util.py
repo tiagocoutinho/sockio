@@ -40,9 +40,9 @@ def ensure_connection(f):
     if asyncio.iscoroutinefunction(f):
         @functools.wraps(f)
         async def wrapper(self, *args, **kwargs):
+            if self.auto_reconnect and not self.connected:
+                await self.open()
             async with self._lock:
-                if self.auto_reconnect and not self.connected:
-                    await self.open()
                 return await f(self, *args, **kwargs)
     else:
         wrapper = f

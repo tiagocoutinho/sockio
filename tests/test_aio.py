@@ -84,7 +84,7 @@ async def test_callbacks(aio_server):
     host, port = aio_server.sockets[0].getsockname()
     state = dict(made=0, lost=0, eof=0)
 
-    def made(transport):
+    def made():
         state['made'] += 1
 
     def lost(exc):
@@ -150,7 +150,7 @@ async def test_coroutine_callbacks(aio_server):
     RESP_TIME = 0.02
     state = dict(made=0, lost=0, eof=0)
 
-    async def made(transport):
+    async def made():
         await asyncio.sleep(RESP_TIME)
         state['made'] += 1
 
@@ -174,10 +174,6 @@ async def test_coroutine_callbacks(aio_server):
     await aio_tcp.open()
     assert aio_tcp.connected
     assert aio_tcp.connection_counter == 1
-    assert state['made'] == 0
-    assert state['lost'] == 0
-    assert state['eof'] == 0
-    await asyncio.sleep(RESP_TIME + 0.01)
     assert state['made'] == 1
     assert state['lost'] == 0
     assert state['eof'] == 0
@@ -204,10 +200,6 @@ async def test_coroutine_callbacks(aio_server):
     await aio_tcp.open()
     assert aio_tcp.connected
     assert aio_tcp.connection_counter == 2
-    assert state['made'] == 1
-    assert state['lost'] == 1
-    assert state['eof'] == 0
-    await asyncio.sleep(RESP_TIME + 0.01)
     assert state['made'] == 2
     assert state['lost'] == 1
     assert state['eof'] == 0
@@ -240,7 +232,7 @@ async def test_error_callback(aio_server):
 
     state = dict(made=0)
 
-    def error_callback(transport):
+    def error_callback():
         state['made'] += 1
         raise RuntimeError('cannot handle this')
 
@@ -262,7 +254,7 @@ async def test_eof_callback(aio_server):
     host, port = aio_server.sockets[0].getsockname()
     state = dict(made=0, lost=0, eof=0)
 
-    def made(transport):
+    def made():
         state['made'] += 1
 
     def lost(exc):

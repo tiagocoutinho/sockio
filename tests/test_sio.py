@@ -78,7 +78,7 @@ async def test_callbacks(sio_server):
     host, port = sio_server.sockets[0].getsockname()
     state = dict(made=0, lost=0, eof=0)
 
-    def made(transport):
+    def made():
         state['made'] += 1
 
     def lost(exc):

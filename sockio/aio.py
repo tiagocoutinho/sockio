@@ -13,11 +13,6 @@ log = logging.getLogger('sockio')
 
 class StreamReaderProtocol(asyncio.StreamReaderProtocol):
 
-    def connection_made(self, transport):
-        result = super().connection_made(transport)
-        self._exec_callback('connection_made_cb', transport)
-        return result
-
     def connection_lost(self, exc):
         result = super().connection_lost(exc)
         self._exec_callback('connection_lost_cb', exc)
@@ -63,13 +58,12 @@ class StreamReader(asyncio.StreamReader):
 
 
 async def open_connection(host=None, port=None, loop=None, flags=0,
-                          on_connection_made=None, on_connection_lost=None,
+                          on_connection_lost=None,
                           on_eof_received=None):
     if loop is None:
         loop = asyncio.get_event_loop()
     reader = StreamReader(loop=loop)
     protocol = StreamReaderProtocol(reader, loop=loop)
-    protocol.connection_made_cb = on_connection_made
     protocol.connection_lost_cb = on_connection_lost
     protocol.eof_received_cb = on_eof_received
     transport, _ = await loop.create_connection(
@@ -109,13 +103,21 @@ class TCP:
     @with_log
     async def open(self):
         if self.connected:
-            raise ConnectionError('socket already open. must close it first')
+            raise ConnectionError('socket already open')
         self._log.debug('open connection (#%d)', self.connection_counter + 1)
         self.reader, self.writer = await open_connection(
             self.host, self.port,
-            on_connection_made=self.on_connection_made,
             on_connection_lost=self.on_connection_lost,
             on_eof_received=self.on_eof_received)
+        if self.on_connection_made is not None:
+            try:
+                res = self.on_connection_made()
+                if asyncio.iscoroutine(res):
+                    await res
+            except Exception:
+                log.exception(
+                    'Error in connection_made callback %r',
+                    self.on_connection_made.__name__)
         self.connection_counter += 1
 
     @with_log
@@ -135,26 +137,37 @@ class TCP:
         return not eof
 
     @with_log
-    @ensure_connection
-    async def read(self, n=-1):
+    async def _read(self, n=-1):
         return await self.reader.read(n)
 
     @with_log
-    @ensure_connection
-    async def readline(self, eol=None):
+    async def _readline(self, eol=None):
         if eol is None:
             eol = self.eol
         return await self.reader.readline(eol=eol)
 
     @with_log
+    async def _write(self, data):
+        self.writer.write(data)
+        await self.writer.drain()
+
+    @with_log
+    async def _writelines(self, lines):
+        self.writer.writelines(lines)
+        await self.writer.drain()
+
+
+    @ensure_connection
+    async def read(self, n=-1):
+        return await self._read(n)
+
+    @ensure_connection
+    async def readline(self, eol=None):
+        return await self._readline(eol=eol)
+
     @ensure_connection
     async def readlines(self, n, eol=None):
-        if eol is None:
-            eol = self.eol
-        result = []
-        for i in range(n):
-            result.append(await self.reader.readline(eol=eol))
-        return result
+        return [await self._readline(eol=eol) for i in range(n)]
 
     @with_log
     @ensure_connection
@@ -166,52 +179,31 @@ class TCP:
     async def readuntil(self, separator=b'\n'):
         return await self.reader.readuntil(separator)
 
-    @with_log
     @ensure_connection
     async def write(self, data):
-        self.writer.write(data)
-        await self.writer.drain()
+        return await self._write(data)
 
-    @with_log
     @ensure_connection
     async def writelines(self, lines):
-        self.writer.writelines(lines)
-        await self.writer.drain()
+        return await self._writelines(lines)
 
-    @with_log
     @ensure_connection
     async def write_readline(self, data, eol=None):
-        if eol is None:
-            eol = self.eol
-        self.writer.write(data)
-        await self.writer.drain()
-        return await self.reader.readline(eol=eol)
+        await self._write(data)
+        return await self._readline(eol=eol)
 
-    @with_log
     @ensure_connection
     async def write_readlines(self, data, n, eol=None):
-        if eol is None:
-            eol = self.eol
-        self.writer.write(data)
-        await self.writer.drain()
-        result = []
-        for i in range(n):
-            result.append(await self.reader.readline(eol=eol))
-        return result
+        await self._write(data)
+        return [await self._readline(eol=eol) for i in range(n)]
 
     @with_log
     @ensure_connection
     async def writelines_readlines(self, lines, n=None, eol=None):
         if n is None:
             n = len(lines)
-        if eol is None:
-            eol = self.eol
-        self.writer.writelines(lines)
-        await self.writer.drain()
-        result = []
-        for i in range(n):
-            result.append(await self.reader.readline(eol=eol))
-        return result
+        await self._writelines(lines)
+        return [await self._readline(eol=eol) for i in range(n)]
 
 
 def parse_args(args=None):
