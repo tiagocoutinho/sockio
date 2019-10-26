@@ -6,7 +6,7 @@ import sockio.aio
 
 async def main():
     event = asyncio.Event()
-    s = sockio.aio.Socket('localhost', 12345, on_eof_received=event.set)
+    s = sockio.aio.TCP('localhost', 12345, on_eof_received=event.set)
     async for line in s:
         print(line)
     await s.close()

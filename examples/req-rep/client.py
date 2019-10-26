@@ -6,7 +6,7 @@ import sockio.aio
 
 async def main():
     event = asyncio.Event()
-    s = sockio.aio.Socket('localhost', 12345, on_eof_received=event.set)
+    s = sockio.aio.TCP('localhost', 12345, on_eof_received=event.set)
     reply = await s.write_readline(b'*idn?\n')
     print('Server replies with: {!r}'.format(reply))
     print('Looks like the server is running. Great!')
