@@ -6,10 +6,6 @@ import sys
 from setuptools import setup, find_packages
 
 
-if sys.version_info < (3, 5):
-    print('sockio needs python >= 3.5')
-    exit(1)
-
 TESTING = any(x in sys.argv for x in ["test", "pytest"])
 
 setup_requirements = []
