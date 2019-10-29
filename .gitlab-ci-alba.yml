@@ -1,0 +1,3 @@
+include: 
+- https://git.cells.es/ctpkg/ci/ctpipeline/raw/master/ctjobdefs-ci.yml
+- https://git.cells.es/ctpkg/ci/ctpipeline/raw/master/ctpipeline.yml
