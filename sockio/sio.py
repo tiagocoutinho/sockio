@@ -77,10 +77,12 @@ class EventLoop(threading.Thread):
     def tcp(self, host, port, auto_reconnect=True,
                on_connection_made=None, on_connection_lost=None,
                on_eof_received=None, resolve_futures=True):
-        sock = aio.TCP(host, port, auto_reconnect=auto_reconnect,
-                       on_connection_made=on_connection_made,
-                       on_connection_lost=on_connection_lost,
-                       on_eof_received=on_eof_received)
+        async def create():
+            return aio.TCP(host, port, auto_reconnect=auto_reconnect,
+                           on_connection_made=on_connection_made,
+                           on_connection_lost=on_connection_lost,
+                           on_eof_received=on_eof_received)
+        sock = self.run_coroutine(create()).result()
         return self.proxy(sock, resolve_futures)
 
 
