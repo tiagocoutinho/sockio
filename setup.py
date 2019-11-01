@@ -27,6 +27,7 @@ setup(
         'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Developers',
         'Natural Language :: English',
+        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
@@ -43,6 +44,6 @@ setup(
     tests_require=test_requirements,
     url='https://tiagocoutinho.github.io/sockio/',
     version='0.3.2',
-    python_requires='>=3.5',
+    python_requires='>=2.7',
     zip_safe=True
 )
