@@ -5,6 +5,7 @@ import pytest
 
 import sockio.aio
 import sockio.sio
+import sockio.py2
 
 
 IDN_REQ, IDN_REP = b'*idn?\n', b'ACME, bla ble ble, 1234, 5678\n'
@@ -76,5 +77,13 @@ def sio_server():
 def sio_tcp(sio_server):
     addr = sio_server.sockets[0].getsockname()
     sock = sockio.sio.TCP(*addr)
+    yield sock
+    sock.close()
+
+
+@pytest.fixture
+def py2_tcp(sio_server):
+    addr = sio_server.sockets[0].getsockname()
+    sock = sockio.py2.TCP(*addr)
     yield sock
     sock.close()
