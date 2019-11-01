@@ -17,6 +17,8 @@ Base implementation written in asyncio with support for different concurrency mo
 * asyncio
 * classic blocking API
 * future based API
+* python 2 compatible blocking API (for those pour souls stuck with python 2)
+
 
 ## Installation
 
@@ -57,6 +59,16 @@ print(reply)
 
 ```python
 from sockio.sio import TCP
+
+sock = TCP('acme.example.com', 5000, resolve_futures=False)
+reply = sock.write_readline(b'*IDN?\n').result()
+print(reply)
+```
+
+*python 2 compatibility*
+
+```python
+from sockio.py2 import TCP
 
 sock = TCP('acme.example.com', 5000, resolve_futures=False)
 reply = sock.write_readline(b'*IDN?\n').result()
@@ -125,6 +137,8 @@ sock = TCP('acme.example.com', 5000, on_connection_made=connected)
 
 (see examples/req-rep/client.py)
 
+Connection event callbacks are **not** available in *python 2 compatibility module*.
+
 ### Streams
 
 sockio TCPs are asynchronous iterable objects. This means that line streaming
@@ -136,6 +150,9 @@ sock = TCP('acme.example.com', 5000, eol=b'\r')
 async for line in sock:
     print(line)
 ```
+
+Streams are **not** available in *python 2 compatibility module*. Let me know
+if you need them by writing an issue. Also feel free to make a PR!
 
 ## Missing features
 
