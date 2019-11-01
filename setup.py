@@ -43,7 +43,7 @@ setup(
     test_suite='tests',
     tests_require=test_requirements,
     url='https://tiagocoutinho.github.io/sockio/',
-    version='0.3.2',
+    version='0.4.0',
     python_requires='>=2.7',
     zip_safe=True
 )
