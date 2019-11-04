@@ -6,9 +6,12 @@ from .util import with_log, ensure_connection
 
 
 PY_37 = sys.version_info >= (3, 7)
+DEFAULT_LIMIT = 2 ** 20 # 1Mb
 
 
 log = logging.getLogger('sockio')
+
+
 
 
 class StreamReaderProtocol(asyncio.StreamReaderProtocol):
@@ -57,12 +60,13 @@ class StreamReader(asyncio.StreamReader):
         return line
 
 
-async def open_connection(host=None, port=None, loop=None, flags=0,
+async def open_connection(host=None, port=None, loop=None,
+                          limit=DEFAULT_LIMIT, flags=0,
                           on_connection_lost=None,
                           on_eof_received=None):
     if loop is None:
         loop = asyncio.get_event_loop()
-    reader = StreamReader(loop=loop)
+    reader = StreamReader(limit=limit, loop=loop)
     protocol = StreamReaderProtocol(reader, loop=loop)
     protocol.connection_lost_cb = on_connection_lost
     protocol.eof_received_cb = on_eof_received
@@ -76,10 +80,11 @@ class TCP:
 
     def __init__(self, host, port, eol=b'\n', auto_reconnect=True,
                  on_connection_made=None, on_connection_lost=None,
-                 on_eof_received=None):
+                 on_eof_received=None, buffer_size=DEFAULT_LIMIT):
         self.host = host
         self.port = port
         self.eol = eol
+        self.buffer_size = buffer_size
         self.auto_reconnect = auto_reconnect
         self.connection_counter = 0
         self.on_connection_made = on_connection_made
@@ -106,7 +111,7 @@ class TCP:
             raise ConnectionError('socket already open')
         self._log.debug('open connection (#%d)', self.connection_counter + 1)
         self.reader, self.writer = await open_connection(
-            self.host, self.port,
+            self.host, self.port, limit=self.buffer_size,
             on_connection_lost=self.on_connection_lost,
             on_eof_received=self.on_eof_received)
         if self.on_connection_made is not None:
