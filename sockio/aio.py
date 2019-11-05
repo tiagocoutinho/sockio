@@ -12,8 +12,6 @@ DEFAULT_LIMIT = 2 ** 20 # 1Mb
 log = logging.getLogger('sockio')
 
 
-
-
 class StreamReaderProtocol(asyncio.StreamReaderProtocol):
 
     def connection_lost(self, exc):
@@ -152,6 +150,15 @@ class TCP:
         return await self.reader.readline(eol=eol)
 
     @with_log
+    async def _readlines(self, n, eol=None):
+        if eol is None:
+            eol = self.eol
+        result = []
+        for _ in range(n):
+            result.append(await self.reader.readline(eol=eol))
+        return result
+
+    @with_log
     async def _write(self, data):
         self.writer.write(data)
         await self.writer.drain()
@@ -160,7 +167,6 @@ class TCP:
     async def _writelines(self, lines):
         self.writer.writelines(lines)
         await self.writer.drain()
-
 
     @ensure_connection
     async def read(self, n=-1):
@@ -172,7 +178,7 @@ class TCP:
 
     @ensure_connection
     async def readlines(self, n, eol=None):
-        return [await self._readline(eol=eol) for i in range(n)]
+        return await self._readlines(n, eol=eol)
 
     @with_log
     @ensure_connection
@@ -200,7 +206,7 @@ class TCP:
     @ensure_connection
     async def write_readlines(self, data, n, eol=None):
         await self._write(data)
-        return [await self._readline(eol=eol) for i in range(n)]
+        return await self._readlines(n, eol=eol)
 
     @with_log
     @ensure_connection
@@ -208,7 +214,7 @@ class TCP:
         if n is None:
             n = len(lines)
         await self._writelines(lines)
-        return [await self._readline(eol=eol) for i in range(n)]
+        return await self._readlines(n, eol=eol)
 
 
 def parse_args(args=None):
