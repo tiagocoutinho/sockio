@@ -77,6 +77,24 @@ print(reply)
 
 ## Features
 
+The main goal of a sockio TCP object is to facilitate communication
+with instruments which listen on a TCP socket.
+
+The most frequent cases include instruments which expect a REQ/REP
+semantics with ASCII protocols like SCPI. In these cases most commands
+translate in small packets being exchanged between the host and the
+instrument. Care has been taken in this library to make sure we reduce
+latency as much as possible. This translates into the following defaults
+when creating a TCP object:
+
+* TCP no delay is active. Can be disabled with `TCP(..., no_delay=False)`.
+  This prevents the kernel from applying
+  [Nagle's algorithm](https://en.wikipedia.org/wiki/Nagle%27s_algorithm)
+* TCP ToS is set to LOWDELAY. This effectively prioritizes our packets
+  if favor of other concurrent communications. Can be disabled with
+  `TCP(tos=IPTOS_NORMAL)`
+
+
 ### REQ-REP semantics
 
 Many instruments out there have a Request-Reply protocol. A sockio TCP

@@ -1,4 +1,5 @@
 import sys
+import socket
 import asyncio
 import logging
 
@@ -6,6 +7,12 @@ from .util import with_log, ensure_connection
 
 
 PY_37 = sys.version_info >= (3, 7)
+
+IPTOS_NORMAL = 0x0
+IPTOS_LOWDELAY = 0x10
+IPTOS_THROUGHPUT = 0x08
+IPTOS_RELIABILITY = 0x04
+IPTOS_MINCOST = 0x02
 DEFAULT_LIMIT = 2 ** 20 # 1Mb
 
 
@@ -61,7 +68,9 @@ class StreamReader(asyncio.StreamReader):
 async def open_connection(host=None, port=None, loop=None,
                           limit=DEFAULT_LIMIT, flags=0,
                           on_connection_lost=None,
-                          on_eof_received=None):
+                          on_eof_received=None,
+                          no_delay=True,
+                          tos=IPTOS_LOWDELAY):
     if loop is None:
         loop = asyncio.get_event_loop()
     reader = StreamReader(limit=limit, loop=loop)
@@ -71,6 +80,11 @@ async def open_connection(host=None, port=None, loop=None,
     transport, _ = await loop.create_connection(
         lambda: protocol, host, port, flags=flags)
     writer = asyncio.StreamWriter(transport, protocol, reader, loop)
+    sock = writer.transport.get_extra_info('socket')
+    if hasattr(socket, 'TCP_NODELAY'):
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1 if no_delay else 0)
+    if hasattr(socket, 'IP_TOS'):
+        sock.setsockopt(socket.SOL_IP, socket.IP_TOS, tos)
     return reader, writer
 
 
@@ -78,7 +92,8 @@ class TCP:
 
     def __init__(self, host, port, eol=b'\n', auto_reconnect=True,
                  on_connection_made=None, on_connection_lost=None,
-                 on_eof_received=None, buffer_size=DEFAULT_LIMIT):
+                 on_eof_received=None, buffer_size=DEFAULT_LIMIT,
+                 no_delay=True, tos=IPTOS_LOWDELAY):
         self.host = host
         self.port = port
         self.eol = eol
@@ -88,6 +103,8 @@ class TCP:
         self.on_connection_made = on_connection_made
         self.on_connection_lost = on_connection_lost
         self.on_eof_received = on_eof_received
+        self.no_delay = no_delay
+        self.tos= tos
         self.reader = None
         self.writer = None
         self._log = log.getChild('TCP({}:{})'.format(host, port))
@@ -111,7 +128,8 @@ class TCP:
         self.reader, self.writer = await open_connection(
             self.host, self.port, limit=self.buffer_size,
             on_connection_lost=self.on_connection_lost,
-            on_eof_received=self.on_eof_received)
+            on_eof_received=self.on_eof_received,
+            no_delay=self.no_delay, tos=self.tos)
         if self.on_connection_made is not None:
             try:
                 res = self.on_connection_made()
