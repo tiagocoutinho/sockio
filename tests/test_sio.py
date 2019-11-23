@@ -243,9 +243,8 @@ def test_read(sio_tcp):
         assert expected == reply
 
 
-@pytest.mark.skip('would block')
-def test_cli(aio_server, capsys):
-    _, port = aio_server.sockets[0].getsockname()
+def test_cli(sio_server, capsys):
+    _, port = sio_server.sockets[0].getsockname()
     main(['--port', str(port)])
     captured = capsys.readouterr()
     assert captured.out == repr(IDN_REP) + '\n'
