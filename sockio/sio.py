@@ -17,25 +17,45 @@ class BaseProxy:
 def ensure_running(f):
     @functools.wraps(f)
     def wrapper(self, *args, **kwargs):
-        if not self.is_alive():
+        if self.master and self.thread is None:
             self.start()
         return f(self, *args, **kwargs)
     return wrapper
 
 
-class EventLoop(threading.Thread):
+class EventLoop:
 
-    def __init__(self, name='AIOTH', loop=None):
-        self.loop = loop or asyncio.new_event_loop()
+    def __init__(self, loop=None):
+        self.master = loop is None
+        self.thread = None
+        self.loop = loop
         self.proxies = {}
-        super().__init__(name=name)
-        self.daemon = True
 
-    def run(self):
-        asyncio.set_event_loop(self.loop)
-        self.loop.run_forever()
+    def start(self):
+        if self.thread:
+            raise RuntimeError('event loop already started')
+        if self.loop:
+            raise RuntimeError('cannot run non master event loop')
+
+        def run():
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
+            started.set()
+            self.loop.run_forever()
+
+        started = threading.Event()
+        self.thread = threading.Thread(name='AIOTH', target=run)
+        self.thread.daemon = True
+        self.thread.start()
+        started.wait()
 
     def stop(self):
+        if self.loop is None:
+            if self.thread is None:
+                raise RuntimeError('event loop not started')
+        else:
+            if self.thread is None:
+                raise RuntimeError('cannot stop non master event loop')
         self.loop.call_soon_threadsafe(self.loop.stop)
 
     @ensure_running
