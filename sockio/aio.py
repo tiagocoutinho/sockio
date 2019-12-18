@@ -2,8 +2,7 @@ import sys
 import socket
 import asyncio
 import logging
-
-from .util import with_log, ensure_connection
+import functools
 
 
 PY_37 = sys.version_info >= (3, 7)
@@ -17,6 +16,19 @@ DEFAULT_LIMIT = 2 ** 20 # 1Mb
 
 
 log = logging.getLogger('sockio')
+
+
+def ensure_connection(f):
+    if asyncio.iscoroutinefunction(f):
+        @functools.wraps(f)
+        async def wrapper(self, *args, **kwargs):
+            if self.auto_reconnect and not self.connected:
+                await self.open()
+            async with self._lock:
+                return await f(self, *args, **kwargs)
+    else:
+        wrapper = f
+    return wrapper
 
 
 class StreamReaderProtocol(asyncio.StreamReaderProtocol):
@@ -120,7 +132,6 @@ class TCP:
             raise StopAsyncIteration
         return val
 
-    @with_log
     async def open(self):
         if self.connected:
             raise ConnectionError('socket already open')
@@ -141,7 +152,6 @@ class TCP:
                     self.on_connection_made.__name__)
         self.connection_counter += 1
 
-    @with_log
     async def close(self):
         if self.writer is not None:
             self.writer.close()
@@ -157,17 +167,14 @@ class TCP:
         eof = self.reader.at_eof()
         return not eof
 
-    @with_log
     async def _read(self, n=-1):
         return await self.reader.read(n)
 
-    @with_log
     async def _readline(self, eol=None):
         if eol is None:
             eol = self.eol
         return await self.reader.readline(eol=eol)
 
-    @with_log
     async def _readlines(self, n, eol=None):
         if eol is None:
             eol = self.eol
@@ -176,12 +183,10 @@ class TCP:
             result.append(await self.reader.readline(eol=eol))
         return result
 
-    @with_log
     async def _write(self, data):
         self.writer.write(data)
         await self.writer.drain()
 
-    @with_log
     async def _writelines(self, lines):
         self.writer.writelines(lines)
         await self.writer.drain()
@@ -198,12 +203,10 @@ class TCP:
     async def readlines(self, n, eol=None):
         return await self._readlines(n, eol=eol)
 
-    @with_log
     @ensure_connection
     async def readexactly(self, n):
         return await self.reader.readexactly(n)
 
-    @with_log
     @ensure_connection
     async def readuntil(self, separator=b'\n'):
         return await self.reader.readuntil(separator)
@@ -226,7 +229,6 @@ class TCP:
         await self._write(data)
         return await self._readlines(n, eol=eol)
 
-    @with_log
     @ensure_connection
     async def writelines_readlines(self, lines, n=None, eol=None):
         if n is None:
