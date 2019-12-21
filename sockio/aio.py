@@ -19,15 +19,12 @@ log = logging.getLogger('sockio')
 
 
 def ensure_connection(f):
-    if asyncio.iscoroutinefunction(f):
-        @functools.wraps(f)
-        async def wrapper(self, *args, **kwargs):
-            if self.auto_reconnect and not self.connected:
-                await self.open()
-            async with self._lock:
-                return await f(self, *args, **kwargs)
-    else:
-        wrapper = f
+    assert asyncio.iscoroutinefunction(f)
+    @functools.wraps(f)
+    async def wrapper(self, *args, **kwargs):
+        if self.auto_reconnect and not self.connected:
+            await self.open()
+        return await f(self, *args, **kwargs)
     return wrapper
 
 
@@ -120,7 +117,6 @@ class TCP:
         self.reader = None
         self.writer = None
         self._log = log.getChild('TCP({}:{})'.format(host, port))
-        self._lock = asyncio.Lock()
 
     def __aiter__(self):
         return self
