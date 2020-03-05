@@ -70,7 +70,7 @@ print(reply)
 ```python
 from sockio.py2 import TCP
 
-sock = TCP('acme.example.com', 5000, resolve_futures=False)
+sock = TCP('acme.example.com', 5000)
 reply = sock.write_readline(b'*IDN?\n').result()
 print(reply)
 ```
