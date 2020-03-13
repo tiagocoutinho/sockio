@@ -95,8 +95,8 @@ class EventLoop:
 
     @ensure_running
     def tcp(self, host, port, auto_reconnect=True,
-               on_connection_made=None, on_connection_lost=None,
-               on_eof_received=None, resolve_futures=True):
+            on_connection_made=None, on_connection_lost=None,
+            on_eof_received=None, resolve_futures=True):
         async def create():
             return aio.TCP(host, port, auto_reconnect=auto_reconnect,
                            on_connection_made=on_connection_made,

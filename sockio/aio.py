@@ -12,7 +12,7 @@ IPTOS_LOWDELAY = 0x10
 IPTOS_THROUGHPUT = 0x08
 IPTOS_RELIABILITY = 0x04
 IPTOS_MINCOST = 0x02
-DEFAULT_LIMIT = 2 ** 20 # 1Mb
+DEFAULT_LIMIT = 2 ** 20  # 1Mb
 
 
 log = logging.getLogger('sockio')
@@ -113,7 +113,7 @@ class TCP:
         self.on_connection_lost = on_connection_lost
         self.on_eof_received = on_eof_received
         self.no_delay = no_delay
-        self.tos= tos
+        self.tos = tos
         self.reader = None
         self.writer = None
         self._log = log.getChild('TCP({}:{})'.format(host, port))
