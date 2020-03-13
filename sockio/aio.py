@@ -73,6 +73,12 @@ class StreamReader(asyncio.StreamReader):
             raise ValueError(e.args[0])
         return line
 
+    def __len__(self):
+        return len(self._buffer)
+
+    def reset(self):
+        self._buffer.clear()
+
 
 async def open_connection(host=None, port=None, loop=None,
                           limit=DEFAULT_LIMIT, flags=0,
@@ -118,6 +124,10 @@ class TCP:
         self.writer = None
         self._log = log.getChild('TCP({}:{})'.format(host, port))
 
+    def __del__(self):
+        if self.writer is not None:
+            self.writer.close()
+
     def __aiter__(self):
         return self
 
@@ -157,6 +167,10 @@ class TCP:
         self.writer = None
 
     @property
+    def in_waiting(self):
+        return len(self.reader) if self.connected else 0
+
+    @property
     def connected(self):
         if self.reader is None:
             return False
@@ -174,10 +188,7 @@ class TCP:
     async def _readlines(self, n, eol=None):
         if eol is None:
             eol = self.eol
-        result = []
-        for _ in range(n):
-            result.append(await self.reader.readline(eol=eol))
-        return result
+        return [await self.reader.readline(eol=eol) for _ in range(n)]
 
     async def _write(self, data):
         self.writer.write(data)
@@ -208,6 +219,12 @@ class TCP:
         return await self.reader.readuntil(separator)
 
     @ensure_connection
+    async def readbuffer(self):
+        """Read all bytes currently available in the underlying buffer"""
+        size = self.in_waiting
+        return (await self._read(size)) if size else b''
+
+    @ensure_connection
     async def write(self, data):
         return await self._write(data)
 
@@ -231,6 +248,10 @@ class TCP:
             n = len(lines)
         await self._writelines(lines)
         return await self._readlines(n, eol=eol)
+
+    def reset_input_buffer(self):
+        if self.connected:
+            self.reader.reset()
 
 
 def parse_args(args=None):
