@@ -126,7 +126,11 @@ class TCP:
 
     def __del__(self):
         if self.writer is not None:
-            self.writer.close()
+            loop = self.writer._loop  # !watch out: access internal stream loop
+            if loop is not None and not loop.is_closed():
+                self.writer.close()
+            else:
+                self._log.warning('could not close stream: loop closed')
 
     def __aiter__(self):
         return self
