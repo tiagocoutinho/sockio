@@ -1,0 +1,42 @@
+{% set name = "sockio" %}
+{% set version = "0.5.1" %}
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source:
+  url: "https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz"
+
+build:
+  number: 0
+  noarch: python
+  script: "{{ PYTHON }} -m pip install . -vv"
+
+requirements:
+  host:
+    - pip
+    - python
+  run:
+    - python
+
+test:
+  imports:
+    - sockio
+  requires:
+    - pytest
+    - pytest-asyncio
+    - pytest-cov
+
+about:
+  home: "https://tiagocoutinho.github.io/sockio/"
+  license: GPLv3+
+  license_family: GPL3
+  license_file: 
+  summary: "Concurrency agnostic socket API"
+  doc_url: 
+  dev_url: 
+
+extra:
+  recipe-maintainers:
+    - your-github-id-here
