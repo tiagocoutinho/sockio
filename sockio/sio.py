@@ -94,25 +94,9 @@ class EventLoop:
         return Proxy(obj)
 
     @ensure_running
-    def tcp(
-        self,
-        host,
-        port,
-        auto_reconnect=True,
-        on_connection_made=None,
-        on_connection_lost=None,
-        on_eof_received=None,
-        resolve_futures=True,
-    ):
+    def tcp(self, host, port, resolve_futures=True, **kwargs):
         async def create():
-            return aio.TCP(
-                host,
-                port,
-                auto_reconnect=auto_reconnect,
-                on_connection_made=on_connection_made,
-                on_connection_lost=on_connection_lost,
-                on_eof_received=on_eof_received,
-            )
+            return aio.TCP(host, port, **kwargs)
 
         sock = self.run_coroutine(create()).result()
         return self.proxy(sock, resolve_futures)
