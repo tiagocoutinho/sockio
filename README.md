@@ -122,6 +122,26 @@ The auto-reconnection facility is specially useful when, for example, you
 move equipement from one place to another, or you need to turn off the
 equipment during the night (planet Earth thanks you for saving energy!).
 
+### Timeout
+
+The TCP constructor provides a timeout parameter. It will be taken into
+account when performing an I/O operation (open, read, write, read_writeline,
+etc):
+
+```python
+sock = TCP('acme.example.com', 5000, timeout=1)
+```
+
+Additionally, you can override the object timeout on each I/O method call
+by providing an alternative timeout parameter:
+
+```python
+sock = TCP('acme.example.com', 5000, timeout=1)
+# the next call will raise asyncio.TimeoutError if it takes more than 0.1s
+reply = await sock.write_readline(b'*IDN?\n', timeout=0.1)
+print(reply)
+```
+
 ### Custom EOL
 
 In line based protocols, sometimes people decide `\n` is not a good EOL character.
@@ -174,7 +194,6 @@ if you need them by writing an issue. Also feel free to make a PR!
 
 ## Missing features
 
-* Timeouts
 * Connection retries
 * trio event loop
 * curio event loop

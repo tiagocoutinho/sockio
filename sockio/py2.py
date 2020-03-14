@@ -100,7 +100,7 @@ class TCP(object):
         if self.connected:
             raise ConnectionError("socket already open")
         self._log.debug("openning connection (#%d)...", self.connection_counter + 1)
-        self.conn = Connection(self.host, self.port)
+        self.conn = Connection(self.host, self.port, timeout=self.timeout)
         self.connection_counter += 1
 
     def open(self):

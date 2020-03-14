@@ -25,7 +25,11 @@ def ensure_connection(f):
     async def wrapper(self, *args, **kwargs):
         if self.auto_reconnect and not self.connected:
             await self.open()
-        return await f(self, *args, **kwargs)
+        timeout = kwargs.pop('timeout', self.timeout)
+        coro = f(self, *args, **kwargs)
+        if timeout is not None:
+            coro = asyncio.wait_for(coro, timeout)
+        return await coro
 
     return wrapper
 
@@ -121,6 +125,7 @@ class TCP:
         buffer_size=DEFAULT_LIMIT,
         no_delay=True,
         tos=IPTOS_LOWDELAY,
+        timeout=None
     ):
         self.host = host
         self.port = port
@@ -133,6 +138,7 @@ class TCP:
         self.on_eof_received = on_eof_received
         self.no_delay = no_delay
         self.tos = tos
+        self.timeout = timeout
         self.reader = None
         self.writer = None
         self._log = log.getChild("TCP({}:{})".format(host, port))
@@ -155,11 +161,12 @@ class TCP:
             raise StopAsyncIteration
         return val
 
-    async def open(self):
+    async def open(self, **kwargs):
+        timeout = kwargs.get('timeout', self.timeout)
         if self.connected:
             raise ConnectionError("socket already open")
         self._log.debug("open connection (#%d)", self.connection_counter + 1)
-        self.reader, self.writer = await open_connection(
+        coro = open_connection(
             self.host,
             self.port,
             limit=self.buffer_size,
@@ -168,6 +175,9 @@ class TCP:
             no_delay=self.no_delay,
             tos=self.tos,
         )
+        if timeout is not None:
+            coro = asyncio.wait_for(coro, timeout)
+        self.reader, self.writer = await coro
         if self.on_connection_made is not None:
             try:
                 res = self.on_connection_made()

@@ -20,9 +20,14 @@ async def server_coro(start_serving=True):
         try:
             while True:
                 data = await reader.readline()
-                if data.lower() == IDN_REQ:
+                data_l = data.lower()
+                if data_l == IDN_REQ:
                     msg = IDN_REP
-                elif data.lower().startswith(b"data?"):
+                elif data_l.startswith(b"sleep"):
+                    t = float(data_l.rsplit(b" ", 1)[-1])
+                    await asyncio.sleep(t)
+                    msg = b"OK\n"
+                elif data_l.startswith(b"data?"):
                     n = int(data.strip().split(b" ", 1)[-1])
                     for i in range(n):
                         await asyncio.sleep(0.05)

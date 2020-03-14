@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import subprocess
 import asyncio.subprocess
 
@@ -14,6 +15,7 @@ def test_socket_creation():
     sock = TCP("example.com", 34567)
     assert sock.host == "example.com"
     assert sock.port == 34567
+    assert sock.timeout is None
     assert sock.auto_reconnect
     assert not sock.connected
     assert sock.connection_counter == 0
@@ -29,6 +31,30 @@ async def test_open_fail(unused_tcp_port):
         await sock.open()
     assert not sock.connected
     assert sock.connection_counter == 0
+
+
+@pytest.mark.asyncio
+async def test_open_timeout():
+    timeout = 0.1
+    # TODO: Not cool to use an external connection
+    aio_tcp = TCP("www.google.com", 81, timeout=timeout)
+    with pytest.raises(asyncio.TimeoutError):
+        start = time.time()
+        try:
+            await aio_tcp.open()
+        finally:
+            dt = time.time() - start
+            assert dt > timeout and dt < (timeout + 0.05)
+
+    # TODO: Not cool to use an external connection
+    aio_tcp = TCP("www.google.com", 82)
+    with pytest.raises(asyncio.TimeoutError):
+        start = time.time()
+        try:
+            await aio_tcp.open(timeout=timeout)
+        finally:
+            dt = time.time() - start
+            assert dt > timeout and dt < (timeout + 0.05)
 
 
 @pytest.mark.asyncio
@@ -487,3 +513,33 @@ async def test_cli(aio_server, capsys):
     await main(["--port", str(port)])
     captured = capsys.readouterr()
     assert captured.out == repr(IDN_REP) + "\n"
+
+
+@pytest.mark.asyncio
+async def test_timeout(aio_tcp):
+    timeout = 0.1
+    reply = await aio_tcp.write_readline(IDN_REQ, timeout=timeout)
+    assert reply == IDN_REP
+
+    start = time.time()
+    reply = await aio_tcp.write_readline(b"sleep 0.05\n")
+    dt = time.time() - start
+    assert dt > 0.05
+    assert reply == b"OK\n"
+
+    timeout = 0.1
+    start = time.time()
+    await aio_tcp.write_readline(b"sleep 0.05\n", timeout=timeout)
+    dt = time.time() - start
+    assert dt < timeout
+
+    timeout = 0.09
+    with pytest.raises(asyncio.TimeoutError):
+        start = time.time()
+        try:
+            await aio_tcp.write_readline(b"sleep 1\n", timeout=timeout)
+        finally:
+            dt = time.time() - start
+        assert dt > timeout and dt < (timeout + 0.05)
+
+    await aio_tcp.close()
