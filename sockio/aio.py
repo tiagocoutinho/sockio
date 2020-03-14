@@ -105,8 +105,8 @@ async def open_connection(
     )
     writer = asyncio.StreamWriter(transport, protocol, reader, loop)
     sock = writer.transport.get_extra_info("socket")
-    if hasattr(socket, "TCP_NODELAY"):
-        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1 if no_delay else 0)
+    if hasattr(socket, "TCP_NODELAY") and no_delay:
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     if hasattr(socket, "IP_TOS"):
         sock.setsockopt(socket.SOL_IP, socket.IP_TOS, tos)
     return reader, writer
