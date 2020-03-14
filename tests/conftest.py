@@ -12,9 +12,11 @@ IDN_REQ, IDN_REP = b'*idn?\n', b'ACME, bla ble ble, 1234, 5678\n'
 WRONG_REQ, WRONG_REP = b'wrong question\n', b'ERROR: unknown command\n'
 
 
-def server_coro():
+async def server_coro(start_serving=True):
+    writers = set()
 
     async def cb(reader, writer):
+        writers.add(writer)
         try:
             while True:
                 data = await reader.readline()
@@ -29,6 +31,10 @@ def server_coro():
                     writer.close()
                     await writer.wait_closed()
                     return
+                elif not data:
+                    writer.close()
+                    await writer.wait_closed()
+                    return
                 else:
                     msg = WRONG_REP
                 # add 2ms delay
@@ -37,18 +43,28 @@ def server_coro():
                 await writer.drain()
         except ConnectionResetError:
             pass
+        finally:
+            writers.remove(writer)
 
-    return asyncio.start_server(cb, host='0')
+    async def stop():
+        server.close()
+        await server.wait_closed()
+        assert not server.is_serving()
+        for writer in set(writers):
+            writer.close()
+            await writer.wait_closed()
+
+    server = await asyncio.start_server(
+        cb, host='0', start_serving=start_serving)
+    server.stop = stop
+    return server
 
 
-@pytest.fixture()
+@pytest.fixture
 async def aio_server():
     server = await server_coro()
-    asyncio.create_task(server.serve_forever())
     yield server
-    server.close()
-    await server.wait_closed()
-    assert not server.is_serving()
+    await server.stop()
 
 
 @pytest.fixture
@@ -59,14 +75,17 @@ async def aio_tcp(aio_server):
     await sock.close()
 
 
-@pytest.fixture()
+@pytest.fixture
 def sio_server():
     event_loop = sockio.sio.DefaultEventLoop
     channel = queue.Queue()
+
     async def serve_forever():
-        server = await server_coro()
+        server = await server_coro(start_serving=False)
         channel.put(server)
         await server.serve_forever()
+        await server.stop()
+
     event_loop.run_coroutine(serve_forever())
     server = event_loop.proxy(channel.get())
     yield server
