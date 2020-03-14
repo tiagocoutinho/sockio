@@ -6,7 +6,6 @@ from . import aio
 
 
 class BaseProxy:
-
     def __init__(self, ref):
         self._ref = ref
 
@@ -20,11 +19,11 @@ def ensure_running(f):
         if self.master and self.thread is None:
             self.start()
         return f(self, *args, **kwargs)
+
     return wrapper
 
 
 class EventLoop:
-
     def __init__(self, loop=None):
         self.master = loop is None
         self.thread = None
@@ -33,9 +32,9 @@ class EventLoop:
 
     def start(self):
         if self.thread:
-            raise RuntimeError('event loop already started')
+            raise RuntimeError("event loop already started")
         if self.loop:
-            raise RuntimeError('cannot run non master event loop')
+            raise RuntimeError("cannot run non master event loop")
 
         def run():
             self.loop = asyncio.new_event_loop()
@@ -44,7 +43,7 @@ class EventLoop:
             self.loop.run_forever()
 
         started = threading.Event()
-        self.thread = threading.Thread(name='AIOTH', target=run)
+        self.thread = threading.Thread(name="AIOTH", target=run)
         self.thread.daemon = True
         self.thread.start()
         started.wait()
@@ -52,10 +51,10 @@ class EventLoop:
     def stop(self):
         if self.loop is None:
             if self.thread is None:
-                raise RuntimeError('event loop not started')
+                raise RuntimeError("event loop not started")
         else:
             if self.thread is None:
-                raise RuntimeError('cannot stop non master event loop')
+                raise RuntimeError("cannot stop non master event loop")
         self.loop.call_soon_threadsafe(self.loop.stop)
 
     @ensure_running
@@ -68,18 +67,19 @@ class EventLoop:
             coro = corof(obj._ref, *args, **kwargs)
             future = self.run_coroutine(coro)
             return future.result() if resolve_future else future
+
         return wrapper
 
     def _create_proxy_for(self, klass, resolve_futures=True):
         class Proxy(BaseProxy):
             pass
+
         for name in dir(klass):
-            if name.startswith('_'):
+            if name.startswith("_"):
                 continue
             member = getattr(klass, name)
             if asyncio.iscoroutinefunction(member):
-                member = self._create_coroutine_threadsafe(
-                    member, resolve_futures)
+                member = self._create_coroutine_threadsafe(member, resolve_futures)
             setattr(Proxy, name, member)
         return Proxy
 
@@ -94,14 +94,26 @@ class EventLoop:
         return Proxy(obj)
 
     @ensure_running
-    def tcp(self, host, port, auto_reconnect=True,
-            on_connection_made=None, on_connection_lost=None,
-            on_eof_received=None, resolve_futures=True):
+    def tcp(
+        self,
+        host,
+        port,
+        auto_reconnect=True,
+        on_connection_made=None,
+        on_connection_lost=None,
+        on_eof_received=None,
+        resolve_futures=True,
+    ):
         async def create():
-            return aio.TCP(host, port, auto_reconnect=auto_reconnect,
-                           on_connection_made=on_connection_made,
-                           on_connection_lost=on_connection_lost,
-                           on_eof_received=on_eof_received)
+            return aio.TCP(
+                host,
+                port,
+                auto_reconnect=auto_reconnect,
+                on_connection_made=on_connection_made,
+                on_connection_lost=on_connection_lost,
+                on_eof_received=on_eof_received,
+            )
+
         sock = self.run_coroutine(create()).result()
         return self.proxy(sock, resolve_futures)
 
@@ -114,16 +126,17 @@ def run(options):
     DefaultEventLoop.loop.set_debug(options.debug)
     sock = TCP(options.host, options.port)
     request = options.request
-    lines = request.count('\n')
+    lines = request.count("\n")
     for r in sock.write_readlines(request.encode(), lines):
         print(r)
 
 
 def main(args=None):
     from .aio import parse_args
+
     options = parse_args(args=args)
     run(options)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

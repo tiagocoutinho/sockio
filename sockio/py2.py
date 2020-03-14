@@ -6,13 +6,15 @@ import threading
 try:
     ConnectionError
 except NameError:
+
     class ConnectionError(socket.error):
         pass
+
     class ConnectionResetError(socket.error):
         pass
 
 
-log = logging.getLogger('sockio')
+log = logging.getLogger("sockio")
 
 
 def ensure_closed_on_error(f):
@@ -23,16 +25,16 @@ def ensure_closed_on_error(f):
         except socket.error:
             self.close()
             raise
+
     return wrapper
 
 
 class Connection(object):
-
     def __init__(self, host, port, timeout=1.0):
         self.sock = socket.create_connection((host, port))
         self.sock.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
         self.sock.settimeout(timeout)
-        self.fobj = self.sock.makefile('rwb', 0)
+        self.fobj = self.sock.makefile("rwb", 0)
 
     def close(self):
         if self.sock is not None:
@@ -48,14 +50,14 @@ class Connection(object):
     def readline(self):
         data = self.fobj.readline()
         if not data:
-            raise ConnectionResetError('remote end disconnected')
+            raise ConnectionResetError("remote end disconnected")
         return data
 
     @ensure_closed_on_error
     def read(self, n=-1):
         data = self.fobj.read(n)
         if not data:
-            raise ConnectionResetError('remote end disconnected')
+            raise ConnectionResetError("remote end disconnected")
         return data
 
     @ensure_closed_on_error
@@ -80,25 +82,24 @@ def ensure_connected(f):
                 except socket.error:
                     self._open()
                     return f(self, *args, **kwargs)
+
     return wrapper
 
 
 class TCP(object):
-
     def __init__(self, host, port, timeout=1.0):
         self.host = host
         self.port = port
         self.conn = None
         self.timeout = timeout
-        self._log = log.getChild('TCP({0}:{1})'.format(host, port))
+        self._log = log.getChild("TCP({0}:{1})".format(host, port))
         self._lock = threading.Lock()
         self.connection_counter = 0
 
     def _open(self):
         if self.connected:
-            raise ConnectionError('socket already open')
-        self._log.debug('openning connection (#%d)...',
-                        self.connection_counter + 1)
+            raise ConnectionError("socket already open")
+        self._log.debug("openning connection (#%d)...", self.connection_counter + 1)
         self.conn = Connection(self.host, self.port)
         self.connection_counter += 1
 
@@ -156,19 +157,18 @@ class TCP(object):
 
 def main(args=None):
     import argparse
+
     parser = argparse.ArgumentParser()
     log_level_choices = ["critical", "error", "warning", "info", "debug"]
     log_level_choices += [i.upper() for i in log_level_choices]
-    parser.add_argument('--host', default='0',
-                        help='host / IP')
-    parser.add_argument('-p', '--port', type=int, help='port')
-    parser.add_argument("--log-level", choices=log_level_choices,
-                        default="warning")
+    parser.add_argument("--host", default="0", help="host / IP")
+    parser.add_argument("-p", "--port", type=int, help="port")
+    parser.add_argument("--log-level", choices=log_level_choices, default="warning")
     options = parser.parse_args(args)
-    fmt = '%(asctime)-15s %(levelname)-5s %(threadName)s %(name)s: %(message)s'
+    fmt = "%(asctime)-15s %(levelname)-5s %(threadName)s %(name)s: %(message)s"
     logging.basicConfig(level=options.log_level.upper(), format=fmt)
     return TCP(options.host, options.port)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     conn = main()

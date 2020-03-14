@@ -8,8 +8,8 @@ import sockio.sio
 import sockio.py2
 
 
-IDN_REQ, IDN_REP = b'*idn?\n', b'ACME, bla ble ble, 1234, 5678\n'
-WRONG_REQ, WRONG_REP = b'wrong question\n', b'ERROR: unknown command\n'
+IDN_REQ, IDN_REP = b"*idn?\n", b"ACME, bla ble ble, 1234, 5678\n"
+WRONG_REQ, WRONG_REP = b"wrong question\n", b"ERROR: unknown command\n"
 
 
 async def server_coro(start_serving=True):
@@ -22,11 +22,11 @@ async def server_coro(start_serving=True):
                 data = await reader.readline()
                 if data.lower() == IDN_REQ:
                     msg = IDN_REP
-                elif data.lower().startswith(b'data?'):
-                    n = int(data.strip().split(b' ', 1)[-1])
+                elif data.lower().startswith(b"data?"):
+                    n = int(data.strip().split(b" ", 1)[-1])
                     for i in range(n):
                         await asyncio.sleep(0.05)
-                        writer.write(b'1.2345 5.4321 12345.54321\n')
+                        writer.write(b"1.2345 5.4321 12345.54321\n")
                         await writer.drain()
                     writer.close()
                     await writer.wait_closed()
@@ -54,8 +54,7 @@ async def server_coro(start_serving=True):
             writer.close()
             await writer.wait_closed()
 
-    server = await asyncio.start_server(
-        cb, host='0', start_serving=start_serving)
+    server = await asyncio.start_server(cb, host="0", start_serving=start_serving)
     server.stop = stop
     return server
 

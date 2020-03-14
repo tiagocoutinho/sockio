@@ -6,8 +6,8 @@ from conftest import IDN_REQ, IDN_REP, WRONG_REQ, WRONG_REP
 
 
 def test_socket_creation():
-    sock = TCP('example.com', 34567)
-    assert sock.host == 'example.com'
+    sock = TCP("example.com", 34567)
+    assert sock.host == "example.com"
     assert sock.port == 34567
     assert sock.auto_reconnect == True
     assert not sock.connected
@@ -15,7 +15,7 @@ def test_socket_creation():
 
 
 def test_open_fail(unused_tcp_port):
-    sock = TCP('0', unused_tcp_port)
+    sock = TCP("0", unused_tcp_port)
     assert not sock.connected
     assert sock.connection_counter == 0
 
@@ -26,7 +26,7 @@ def test_open_fail(unused_tcp_port):
 
 
 def test_write_fail(unused_tcp_port):
-    sock = TCP('0', unused_tcp_port)
+    sock = TCP("0", unused_tcp_port)
     assert not sock.connected
     assert sock.connection_counter == 0
 
@@ -37,7 +37,7 @@ def test_write_fail(unused_tcp_port):
 
 
 def test_write_readline_fail(unused_tcp_port):
-    sock = TCP('0', unused_tcp_port)
+    sock = TCP("0", unused_tcp_port)
     assert not sock.connected
     assert sock.connection_counter == 0
 
@@ -78,69 +78,73 @@ def test_callbacks(sio_server):
     state = dict(made=0, lost=0, eof=0)
 
     def made():
-        state['made'] += 1
+        state["made"] += 1
 
     def lost(exc):
-        state['lost'] += 1
+        state["lost"] += 1
 
     def eof():
-        state['eof'] += 1
+        state["eof"] += 1
 
-    sio_tcp = TCP(host, port, on_connection_made=made,
-                   on_connection_lost=lost, on_eof_received=eof)
+    sio_tcp = TCP(
+        host,
+        port,
+        on_connection_made=made,
+        on_connection_lost=lost,
+        on_eof_received=eof,
+    )
     assert not sio_tcp.connected
     assert sio_tcp.connection_counter == 0
-    assert state['made'] == 0
-    assert state['lost'] == 0
-    assert state['eof'] == 0
+    assert state["made"] == 0
+    assert state["lost"] == 0
+    assert state["eof"] == 0
 
     sio_tcp.open()
     assert sio_tcp.connected
     assert sio_tcp.connection_counter == 1
-    assert state['made'] == 1
-    assert state['lost'] == 0
-    assert state['eof'] == 0
+    assert state["made"] == 1
+    assert state["lost"] == 0
+    assert state["eof"] == 0
 
     with pytest.raises(ConnectionError):
         sio_tcp.open()
     assert sio_tcp.connected
     assert sio_tcp.connection_counter == 1
-    assert state['made'] == 1
-    assert state['lost'] == 0
-    assert state['eof'] == 0
+    assert state["made"] == 1
+    assert state["lost"] == 0
+    assert state["eof"] == 0
 
     sio_tcp.close()
     assert not sio_tcp.connected
     assert sio_tcp.connection_counter == 1
-    assert state['made'] == 1
-    assert state['lost'] == 1
-    assert state['eof'] == 0
+    assert state["made"] == 1
+    assert state["lost"] == 1
+    assert state["eof"] == 0
 
     sio_tcp.open()
     assert sio_tcp.connected
     assert sio_tcp.connection_counter == 2
-    assert state['made'] == 2
-    assert state['lost'] == 1
-    assert state['eof'] == 0
+    assert state["made"] == 2
+    assert state["lost"] == 1
+    assert state["eof"] == 0
 
     sio_tcp.close()
     assert not sio_tcp.connected
     assert sio_tcp.connection_counter == 2
-    assert state['made'] == 2
-    assert state['lost'] == 2
-    assert state['eof'] == 0
+    assert state["made"] == 2
+    assert state["lost"] == 2
+    assert state["eof"] == 0
 
     sio_tcp.close()
     assert not sio_tcp.connected
     assert sio_tcp.connection_counter == 2
-    assert state['made'] == 2
-    assert state['lost'] == 2
-    assert state['eof'] == 0
+    assert state["made"] == 2
+    assert state["lost"] == 2
+    assert state["eof"] == 0
 
 
 def test_write_readline(sio_tcp):
-    for request, expected in [(IDN_REQ,  IDN_REP),
-                              (WRONG_REQ,  WRONG_REP)]:
+    for request, expected in [(IDN_REQ, IDN_REP), (WRONG_REQ, WRONG_REP)]:
         reply = sio_tcp.write_readline(request)
         assert sio_tcp.connected
         assert sio_tcp.connection_counter == 1
@@ -148,8 +152,11 @@ def test_write_readline(sio_tcp):
 
 
 def test_write_readlines(sio_tcp):
-    for request, expected in [(IDN_REQ,  [IDN_REP]), (2*IDN_REQ,  2*[IDN_REP]),
-                              (IDN_REQ + WRONG_REQ,  [IDN_REP, WRONG_REP])]:
+    for request, expected in [
+        (IDN_REQ, [IDN_REP]),
+        (2 * IDN_REQ, 2 * [IDN_REP]),
+        (IDN_REQ + WRONG_REQ, [IDN_REP, WRONG_REP]),
+    ]:
         gen = sio_tcp.write_readlines(request, len(expected))
         reply = [line for line in gen]
         assert sio_tcp.connected
@@ -158,8 +165,11 @@ def test_write_readlines(sio_tcp):
 
 
 def test_writelines_readlines(sio_tcp):
-    for request, expected in [([IDN_REQ],  [IDN_REP]), (2*[IDN_REQ],  2*[IDN_REP]),
-                              ([IDN_REQ, WRONG_REQ],  [IDN_REP, WRONG_REP])]:
+    for request, expected in [
+        ([IDN_REQ], [IDN_REP]),
+        (2 * [IDN_REQ], 2 * [IDN_REP]),
+        ([IDN_REQ, WRONG_REQ], [IDN_REP, WRONG_REP]),
+    ]:
         gen = sio_tcp.writelines_readlines(request)
         reply = [line for line in gen]
         assert sio_tcp.connected
@@ -168,8 +178,11 @@ def test_writelines_readlines(sio_tcp):
 
 
 def test_writelines(sio_tcp):
-    for request, expected in [([IDN_REQ],  [IDN_REP]), (2*[IDN_REQ],  2*[IDN_REP]),
-                              ([IDN_REQ, WRONG_REQ],  [IDN_REP, WRONG_REP])]:
+    for request, expected in [
+        ([IDN_REQ], [IDN_REP]),
+        (2 * [IDN_REQ], 2 * [IDN_REP]),
+        ([IDN_REQ, WRONG_REQ], [IDN_REP, WRONG_REP]),
+    ]:
         answer = sio_tcp.writelines(request)
         assert sio_tcp.connected
         assert sio_tcp.connection_counter == 1
@@ -183,8 +196,7 @@ def test_writelines(sio_tcp):
 
 
 def test_readline(sio_tcp):
-    for request, expected in [(IDN_REQ,  IDN_REP),
-                              (WRONG_REQ,  WRONG_REP)]:
+    for request, expected in [(IDN_REQ, IDN_REP), (WRONG_REQ, WRONG_REP)]:
         answer = sio_tcp.write(request)
         assert sio_tcp.connected
         assert sio_tcp.connection_counter == 1
@@ -194,19 +206,17 @@ def test_readline(sio_tcp):
 
 
 def test_readuntil(sio_tcp):
-    for request, expected in [(IDN_REQ,  IDN_REP),
-                              (WRONG_REQ,  WRONG_REP)]:
+    for request, expected in [(IDN_REQ, IDN_REP), (WRONG_REQ, WRONG_REP)]:
         answer = sio_tcp.write(request)
         assert sio_tcp.connected
         assert sio_tcp.connection_counter == 1
         assert answer is None
-        reply = sio_tcp.readuntil(b'\n')
+        reply = sio_tcp.readuntil(b"\n")
         assert expected == reply
 
 
 def test_readexactly(sio_tcp):
-    for request, expected in [(IDN_REQ,  IDN_REP),
-                              (WRONG_REQ,  WRONG_REP)]:
+    for request, expected in [(IDN_REQ, IDN_REP), (WRONG_REQ, WRONG_REP)]:
         answer = sio_tcp.write(request)
         assert sio_tcp.connected
         assert sio_tcp.connection_counter == 1
@@ -218,8 +228,11 @@ def test_readexactly(sio_tcp):
 
 
 def test_readlines(sio_tcp):
-    for request, expected in [(IDN_REQ,  [IDN_REP]), (2*IDN_REQ,  2*[IDN_REP]),
-                              (IDN_REQ + WRONG_REQ,  [IDN_REP, WRONG_REP])]:
+    for request, expected in [
+        (IDN_REQ, [IDN_REP]),
+        (2 * IDN_REQ, 2 * [IDN_REP]),
+        (IDN_REQ + WRONG_REQ, [IDN_REP, WRONG_REP]),
+    ]:
         answer = sio_tcp.write(request)
         assert sio_tcp.connected
         assert sio_tcp.connection_counter == 1
@@ -230,13 +243,12 @@ def test_readlines(sio_tcp):
 
 
 def test_read(sio_tcp):
-    for request, expected in [(IDN_REQ,  IDN_REP),
-                              (WRONG_REQ,  WRONG_REP)]:
+    for request, expected in [(IDN_REQ, IDN_REP), (WRONG_REQ, WRONG_REP)]:
         answer = sio_tcp.write(request)
         assert sio_tcp.connected
         assert sio_tcp.connection_counter == 1
         assert answer is None
-        reply, n = b'', 0
+        reply, n = b"", 0
         while len(reply) < len(expected) and n < 2:
             reply += sio_tcp.read(1024)
             n += 1
@@ -245,6 +257,6 @@ def test_read(sio_tcp):
 
 def test_cli(sio_server, capsys):
     _, port = sio_server.sockets[0].getsockname()
-    main(['--port', str(port)])
+    main(["--port", str(port)])
     captured = capsys.readouterr()
-    assert captured.out == repr(IDN_REP) + '\n'
+    assert captured.out == repr(IDN_REP) + "\n"

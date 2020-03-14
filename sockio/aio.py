@@ -15,29 +15,30 @@ IPTOS_MINCOST = 0x02
 DEFAULT_LIMIT = 2 ** 20  # 1Mb
 
 
-log = logging.getLogger('sockio')
+log = logging.getLogger("sockio")
 
 
 def ensure_connection(f):
     assert asyncio.iscoroutinefunction(f)
+
     @functools.wraps(f)
     async def wrapper(self, *args, **kwargs):
         if self.auto_reconnect and not self.connected:
             await self.open()
         return await f(self, *args, **kwargs)
+
     return wrapper
 
 
 class StreamReaderProtocol(asyncio.StreamReaderProtocol):
-
     def connection_lost(self, exc):
         result = super().connection_lost(exc)
-        self._exec_callback('connection_lost_cb', exc)
+        self._exec_callback("connection_lost_cb", exc)
         return result
 
     def eof_received(self):
         result = super().eof_received()
-        self._exec_callback('eof_received_cb')
+        self._exec_callback("eof_received_cb")
         return result
 
     def _exec_callback(self, name, *args, **kwargs):
@@ -49,13 +50,11 @@ class StreamReaderProtocol(asyncio.StreamReaderProtocol):
             if asyncio.iscoroutine(res):
                 self._loop.create_task(res)
         except Exception:
-            log.exception(
-                'Error in %s callback %r', name, callback.__name__)
+            log.exception("Error in %s callback %r", name, callback.__name__)
 
 
 class StreamReader(asyncio.StreamReader):
-
-    async def readline(self, eol=b'\n'):
+    async def readline(self, eol=b"\n"):
         # This implementation is a copy of the asyncio.StreamReader.readline()
         # with the purpose of supporting different EOL characters.
         # we walk on thin ice here: we rely on the internal _buffer and
@@ -66,7 +65,7 @@ class StreamReader(asyncio.StreamReader):
             return e.partial
         except asyncio.LimitOverrunError as e:
             if self._buffer.startswith(eol, e.consumed):
-                del self._buffer[:e.consumed + len(eol)]
+                del self._buffer[: e.consumed + len(eol)]
             else:
                 self._buffer.clear()
             self._maybe_resume_transport()
@@ -80,12 +79,17 @@ class StreamReader(asyncio.StreamReader):
         self._buffer.clear()
 
 
-async def open_connection(host=None, port=None, loop=None,
-                          limit=DEFAULT_LIMIT, flags=0,
-                          on_connection_lost=None,
-                          on_eof_received=None,
-                          no_delay=True,
-                          tos=IPTOS_LOWDELAY):
+async def open_connection(
+    host=None,
+    port=None,
+    loop=None,
+    limit=DEFAULT_LIMIT,
+    flags=0,
+    on_connection_lost=None,
+    on_eof_received=None,
+    no_delay=True,
+    tos=IPTOS_LOWDELAY,
+):
     if loop is None:
         loop = asyncio.get_event_loop()
     reader = StreamReader(limit=limit, loop=loop)
@@ -93,22 +97,31 @@ async def open_connection(host=None, port=None, loop=None,
     protocol.connection_lost_cb = on_connection_lost
     protocol.eof_received_cb = on_eof_received
     transport, _ = await loop.create_connection(
-        lambda: protocol, host, port, flags=flags)
+        lambda: protocol, host, port, flags=flags
+    )
     writer = asyncio.StreamWriter(transport, protocol, reader, loop)
-    sock = writer.transport.get_extra_info('socket')
-    if hasattr(socket, 'TCP_NODELAY'):
+    sock = writer.transport.get_extra_info("socket")
+    if hasattr(socket, "TCP_NODELAY"):
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1 if no_delay else 0)
-    if hasattr(socket, 'IP_TOS'):
+    if hasattr(socket, "IP_TOS"):
         sock.setsockopt(socket.SOL_IP, socket.IP_TOS, tos)
     return reader, writer
 
 
 class TCP:
-
-    def __init__(self, host, port, eol=b'\n', auto_reconnect=True,
-                 on_connection_made=None, on_connection_lost=None,
-                 on_eof_received=None, buffer_size=DEFAULT_LIMIT,
-                 no_delay=True, tos=IPTOS_LOWDELAY):
+    def __init__(
+        self,
+        host,
+        port,
+        eol=b"\n",
+        auto_reconnect=True,
+        on_connection_made=None,
+        on_connection_lost=None,
+        on_eof_received=None,
+        buffer_size=DEFAULT_LIMIT,
+        no_delay=True,
+        tos=IPTOS_LOWDELAY,
+    ):
         self.host = host
         self.port = port
         self.eol = eol
@@ -122,7 +135,7 @@ class TCP:
         self.tos = tos
         self.reader = None
         self.writer = None
-        self._log = log.getChild('TCP({}:{})'.format(host, port))
+        self._log = log.getChild("TCP({}:{})".format(host, port))
 
     def __del__(self):
         if self.writer is not None:
@@ -130,7 +143,7 @@ class TCP:
             if loop is not None and not loop.is_closed():
                 self.writer.close()
             else:
-                self._log.warning('could not close stream: loop closed')
+                self._log.warning("could not close stream: loop closed")
 
     def __aiter__(self):
         return self
@@ -138,19 +151,23 @@ class TCP:
     @ensure_connection
     async def __anext__(self):
         val = await self.reader.readline()
-        if val == b'':
+        if val == b"":
             raise StopAsyncIteration
         return val
 
     async def open(self):
         if self.connected:
-            raise ConnectionError('socket already open')
-        self._log.debug('open connection (#%d)', self.connection_counter + 1)
+            raise ConnectionError("socket already open")
+        self._log.debug("open connection (#%d)", self.connection_counter + 1)
         self.reader, self.writer = await open_connection(
-            self.host, self.port, limit=self.buffer_size,
+            self.host,
+            self.port,
+            limit=self.buffer_size,
             on_connection_lost=self.on_connection_lost,
             on_eof_received=self.on_eof_received,
-            no_delay=self.no_delay, tos=self.tos)
+            no_delay=self.no_delay,
+            tos=self.tos,
+        )
         if self.on_connection_made is not None:
             try:
                 res = self.on_connection_made()
@@ -158,8 +175,9 @@ class TCP:
                     await res
             except Exception:
                 log.exception(
-                    'Error in connection_made callback %r',
-                    self.on_connection_made.__name__)
+                    "Error in connection_made callback %r",
+                    self.on_connection_made.__name__,
+                )
         self.connection_counter += 1
 
     async def close(self):
@@ -219,14 +237,14 @@ class TCP:
         return await self.reader.readexactly(n)
 
     @ensure_connection
-    async def readuntil(self, separator=b'\n'):
+    async def readuntil(self, separator=b"\n"):
         return await self.reader.readuntil(separator)
 
     @ensure_connection
     async def readbuffer(self):
         """Read all bytes currently available in the underlying buffer"""
         size = self.in_waiting
-        return (await self._read(size)) if size else b''
+        return (await self._read(size)) if size else b""
 
     @ensure_connection
     async def write(self, data):
@@ -260,21 +278,21 @@ class TCP:
 
 def parse_args(args=None):
     import argparse
+
     parser = argparse.ArgumentParser()
     log_level_choices = ["critical", "error", "warning", "info", "debug"]
     log_level_choices += [i.upper() for i in log_level_choices]
-    parser.add_argument('--host', default='0',
-                        help='SCPI device host name / IP')
-    parser.add_argument('-p', '--port', type=int, help='SCPI device port')
-    parser.add_argument('-r', '--request', default='*IDN?\n',
-                        help='SCPI request [%(default)s]')
-    parser.add_argument("--log-level", choices=log_level_choices,
-                        default="warning")
-    parser.add_argument('-d', '--debug', action='store_true')
+    parser.add_argument("--host", default="0", help="SCPI device host name / IP")
+    parser.add_argument("-p", "--port", type=int, help="SCPI device port")
+    parser.add_argument(
+        "-r", "--request", default="*IDN?\n", help="SCPI request [%(default)s]"
+    )
+    parser.add_argument("--log-level", choices=log_level_choices, default="warning")
+    parser.add_argument("-d", "--debug", action="store_true")
     options = parser.parse_args(args)
-    if not options.request.endswith('\n'):
-        options.request += '\n'
-    fmt = '%(asctime)-15s %(levelname)-5s %(threadName)s %(name)s: %(message)s'
+    if not options.request.endswith("\n"):
+        options.request += "\n"
+    fmt = "%(asctime)-15s %(levelname)-5s %(threadName)s %(name)s: %(message)s"
     logging.basicConfig(level=options.log_level.upper(), format=fmt)
     return options
 
@@ -282,7 +300,7 @@ def parse_args(args=None):
 async def run(options):
     sock = TCP(options.host, options.port)
     request = options.request
-    nb_lines = request.count('\n')
+    nb_lines = request.count("\n")
     lines = await sock.write_readlines(request.encode(), nb_lines)
     for line in lines:
         print(line)
@@ -293,5 +311,5 @@ def main(args=None):
     return run(options)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())
