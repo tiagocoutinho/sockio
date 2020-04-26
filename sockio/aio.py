@@ -23,8 +23,12 @@ def ensure_connection(f):
 
     @functools.wraps(f)
     async def wrapper(self, *args, **kwargs):
-        if self.auto_reconnect and not self.connected():
-            await self.open()
+        if self.auto_reconnect:
+            if not self.connected():
+                await self.open()
+            elif self.at_eof():
+                await self.close()
+                await self.open()
         timeout = kwargs.pop('timeout', self.timeout)
         coro = f(self, *args, **kwargs)
         if timeout is not None:
@@ -202,10 +206,10 @@ class TCP:
         return len(self.reader) if self.connected() else 0
 
     def connected(self):
-        if self.reader is None:
-            return False
-        eof = self.reader.at_eof()
-        return not eof
+        return self.reader is not None
+
+    def at_eof(self):
+        return self.reader.at_eof()
 
     async def _read(self, n=-1):
         return await self.reader.read(n)
