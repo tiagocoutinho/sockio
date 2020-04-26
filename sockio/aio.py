@@ -23,7 +23,7 @@ def ensure_connection(f):
 
     @functools.wraps(f)
     async def wrapper(self, *args, **kwargs):
-        if self.auto_reconnect and not self.connected:
+        if self.auto_reconnect and not self.connected():
             await self.open()
         timeout = kwargs.pop('timeout', self.timeout)
         coro = f(self, *args, **kwargs)
@@ -69,7 +69,7 @@ class StreamReader(asyncio.StreamReader):
             return e.partial
         except asyncio.LimitOverrunError as e:
             if self._buffer.startswith(eol, e.consumed):
-                del self._buffer[: e.consumed + len(eol)]
+                del self._buffer[:e.consumed + len(eol)]
             else:
                 self._buffer.clear()
             self._maybe_resume_transport()
@@ -163,7 +163,7 @@ class TCP:
 
     async def open(self, **kwargs):
         timeout = kwargs.get('timeout', self.timeout)
-        if self.connected:
+        if self.connected():
             raise ConnectionError("socket already open")
         self._log.debug("open connection (#%d)", self.connection_counter + 1)
         coro = open_connection(
@@ -198,11 +198,9 @@ class TCP:
         self.reader = None
         self.writer = None
 
-    @property
     def in_waiting(self):
-        return len(self.reader) if self.connected else 0
+        return len(self.reader) if self.connected() else 0
 
-    @property
     def connected(self):
         if self.reader is None:
             return False
@@ -253,7 +251,7 @@ class TCP:
     @ensure_connection
     async def readbuffer(self):
         """Read all bytes currently available in the underlying buffer"""
-        size = self.in_waiting
+        size = self.in_waiting()
         return (await self._read(size)) if size else b""
 
     @ensure_connection
@@ -282,7 +280,7 @@ class TCP:
         return await self._readlines(n, eol=eol)
 
     def reset_input_buffer(self):
-        if self.connected:
+        if self.connected():
             self.reader.reset()
 
 
