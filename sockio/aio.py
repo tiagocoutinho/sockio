@@ -212,25 +212,52 @@ class TCP:
         return self.reader.at_eof()
 
     async def _read(self, n=-1):
-        return await self.reader.read(n)
+        try:
+            reply = await self.reader.read(n)
+        except ConnectionError as err:
+            await self.close()
+            raise err
+        if not reply:
+            await self.close()
+        return reply
 
     async def _readline(self, eol=None):
         if eol is None:
             eol = self.eol
-        return await self.reader.readline(eol=eol)
+        try:
+            reply = await self.reader.readline(eol=eol)
+        except ConnectionError as err:
+            await self.close()
+            raise err
+        if not reply:
+            await self.close()
+        return reply
 
     async def _readlines(self, n, eol=None):
         if eol is None:
             eol = self.eol
-        return [await self.reader.readline(eol=eol) for _ in range(n)]
+        replies = []
+        for i in range(n):
+            reply = await self._readline(eol=eol)
+            if not reply:
+                break
+        return replies
 
     async def _write(self, data):
-        self.writer.write(data)
-        await self.writer.drain()
+        try:
+            self.writer.write(data)
+            await self.writer.drain()
+        except ConnectionError:
+            await self.close()
+            raise
 
     async def _writelines(self, lines):
-        self.writer.writelines(lines)
-        await self.writer.drain()
+        try:
+            self.writer.writelines(lines)
+            await self.writer.drain()
+        except ConnectionError:
+            await self.close()
+            raise
 
     @ensure_connection
     async def read(self, n=-1):
