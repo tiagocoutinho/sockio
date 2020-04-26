@@ -10,66 +10,66 @@ def test_socket_creation():
     assert sock.host == "example.com"
     assert sock.port == 34567
     assert sock.auto_reconnect == True
-    assert not sock.connected
+    assert not sock.connected()
     assert sock.connection_counter == 0
 
 
 def test_open_fail(unused_tcp_port):
     sock = TCP("0", unused_tcp_port)
-    assert not sock.connected
+    assert not sock.connected()
     assert sock.connection_counter == 0
 
     with pytest.raises(ConnectionRefusedError):
         sock.open()
-    assert not sock.connected
+    assert not sock.connected()
     assert sock.connection_counter == 0
 
 
 def test_write_fail(unused_tcp_port):
     sock = TCP("0", unused_tcp_port)
-    assert not sock.connected
+    assert not sock.connected()
     assert sock.connection_counter == 0
 
     with pytest.raises(ConnectionRefusedError):
         sock.write(IDN_REQ)
-    assert not sock.connected
+    assert not sock.connected()
     assert sock.connection_counter == 0
 
 
 def test_write_readline_fail(unused_tcp_port):
     sock = TCP("0", unused_tcp_port)
-    assert not sock.connected
+    assert not sock.connected()
     assert sock.connection_counter == 0
 
     with pytest.raises(ConnectionRefusedError):
         sock.write_readline(IDN_REQ)
-    assert not sock.connected
+    assert not sock.connected()
     assert sock.connection_counter == 0
 
 
 def test_open_close(sio_server, sio_tcp):
-    assert not sio_tcp.connected
+    assert not sio_tcp.connected()
     assert sio_tcp.connection_counter == 0
     assert sio_server.sockets[0].getsockname() == (sio_tcp.host, sio_tcp.port)
 
     sio_tcp.open()
-    assert sio_tcp.connected
+    assert sio_tcp.connected()
     assert sio_tcp.connection_counter == 1
 
     with pytest.raises(ConnectionError):
         sio_tcp.open()
-    assert sio_tcp.connected
+    assert sio_tcp.connected()
     assert sio_tcp.connection_counter == 1
 
     sio_tcp.close()
-    assert not sio_tcp.connected
+    assert not sio_tcp.connected()
     assert sio_tcp.connection_counter == 1
     sio_tcp.open()
-    assert sio_tcp.connected
+    assert sio_tcp.connected()
     assert sio_tcp.connection_counter == 2
     sio_tcp.close()
     sio_tcp.close()
-    assert not sio_tcp.connected
+    assert not sio_tcp.connected()
     assert sio_tcp.connection_counter == 2
 
 
@@ -93,14 +93,14 @@ def test_callbacks(sio_server):
         on_connection_lost=lost,
         on_eof_received=eof,
     )
-    assert not sio_tcp.connected
+    assert not sio_tcp.connected()
     assert sio_tcp.connection_counter == 0
     assert state["made"] == 0
     assert state["lost"] == 0
     assert state["eof"] == 0
 
     sio_tcp.open()
-    assert sio_tcp.connected
+    assert sio_tcp.connected()
     assert sio_tcp.connection_counter == 1
     assert state["made"] == 1
     assert state["lost"] == 0
@@ -108,35 +108,35 @@ def test_callbacks(sio_server):
 
     with pytest.raises(ConnectionError):
         sio_tcp.open()
-    assert sio_tcp.connected
+    assert sio_tcp.connected()
     assert sio_tcp.connection_counter == 1
     assert state["made"] == 1
     assert state["lost"] == 0
     assert state["eof"] == 0
 
     sio_tcp.close()
-    assert not sio_tcp.connected
+    assert not sio_tcp.connected()
     assert sio_tcp.connection_counter == 1
     assert state["made"] == 1
     assert state["lost"] == 1
     assert state["eof"] == 0
 
     sio_tcp.open()
-    assert sio_tcp.connected
+    assert sio_tcp.connected()
     assert sio_tcp.connection_counter == 2
     assert state["made"] == 2
     assert state["lost"] == 1
     assert state["eof"] == 0
 
     sio_tcp.close()
-    assert not sio_tcp.connected
+    assert not sio_tcp.connected()
     assert sio_tcp.connection_counter == 2
     assert state["made"] == 2
     assert state["lost"] == 2
     assert state["eof"] == 0
 
     sio_tcp.close()
-    assert not sio_tcp.connected
+    assert not sio_tcp.connected()
     assert sio_tcp.connection_counter == 2
     assert state["made"] == 2
     assert state["lost"] == 2
@@ -146,7 +146,7 @@ def test_callbacks(sio_server):
 def test_write_readline(sio_tcp):
     for request, expected in [(IDN_REQ, IDN_REP), (WRONG_REQ, WRONG_REP)]:
         reply = sio_tcp.write_readline(request)
-        assert sio_tcp.connected
+        assert sio_tcp.connected()
         assert sio_tcp.connection_counter == 1
         assert expected == reply
 
@@ -159,7 +159,7 @@ def test_write_readlines(sio_tcp):
     ]:
         gen = sio_tcp.write_readlines(request, len(expected))
         reply = [line for line in gen]
-        assert sio_tcp.connected
+        assert sio_tcp.connected()
         assert sio_tcp.connection_counter == 1
         assert expected == reply
 
@@ -172,7 +172,7 @@ def test_writelines_readlines(sio_tcp):
     ]:
         gen = sio_tcp.writelines_readlines(request)
         reply = [line for line in gen]
-        assert sio_tcp.connected
+        assert sio_tcp.connected()
         assert sio_tcp.connection_counter == 1
         assert expected == reply
 
@@ -184,13 +184,13 @@ def test_writelines(sio_tcp):
         ([IDN_REQ, WRONG_REQ], [IDN_REP, WRONG_REP]),
     ]:
         answer = sio_tcp.writelines(request)
-        assert sio_tcp.connected
+        assert sio_tcp.connected()
         assert sio_tcp.connection_counter == 1
         assert answer is None
 
         gen = sio_tcp.readlines(len(expected))
         reply = [line for line in gen]
-        assert sio_tcp.connected
+        assert sio_tcp.connected()
         assert sio_tcp.connection_counter == 1
         assert expected == reply
 
@@ -198,7 +198,7 @@ def test_writelines(sio_tcp):
 def test_readline(sio_tcp):
     for request, expected in [(IDN_REQ, IDN_REP), (WRONG_REQ, WRONG_REP)]:
         answer = sio_tcp.write(request)
-        assert sio_tcp.connected
+        assert sio_tcp.connected()
         assert sio_tcp.connection_counter == 1
         assert answer is None
         reply = sio_tcp.readline()
@@ -208,7 +208,7 @@ def test_readline(sio_tcp):
 def test_readuntil(sio_tcp):
     for request, expected in [(IDN_REQ, IDN_REP), (WRONG_REQ, WRONG_REP)]:
         answer = sio_tcp.write(request)
-        assert sio_tcp.connected
+        assert sio_tcp.connected()
         assert sio_tcp.connection_counter == 1
         assert answer is None
         reply = sio_tcp.readuntil(b"\n")
@@ -218,7 +218,7 @@ def test_readuntil(sio_tcp):
 def test_readexactly(sio_tcp):
     for request, expected in [(IDN_REQ, IDN_REP), (WRONG_REQ, WRONG_REP)]:
         answer = sio_tcp.write(request)
-        assert sio_tcp.connected
+        assert sio_tcp.connected()
         assert sio_tcp.connection_counter == 1
         assert answer is None
         reply = sio_tcp.readexactly(len(expected) - 5)
@@ -234,7 +234,7 @@ def test_readlines(sio_tcp):
         (IDN_REQ + WRONG_REQ, [IDN_REP, WRONG_REP]),
     ]:
         answer = sio_tcp.write(request)
-        assert sio_tcp.connected
+        assert sio_tcp.connected()
         assert sio_tcp.connection_counter == 1
         assert answer is None
         gen = sio_tcp.readlines(len(expected))
@@ -245,7 +245,7 @@ def test_readlines(sio_tcp):
 def test_read(sio_tcp):
     for request, expected in [(IDN_REQ, IDN_REP), (WRONG_REQ, WRONG_REP)]:
         answer = sio_tcp.write(request)
-        assert sio_tcp.connected
+        assert sio_tcp.connected()
         assert sio_tcp.connection_counter == 1
         assert answer is None
         reply, n = b"", 0

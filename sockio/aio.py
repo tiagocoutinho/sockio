@@ -23,17 +23,30 @@ def ensure_connection(f):
 
     @functools.wraps(f)
     async def wrapper(self, *args, **kwargs):
-        if self.auto_reconnect:
-            if not self.connected():
-                await self.open()
-            elif self.at_eof():
-                await self.close()
-                await self.open()
+        if self.auto_reconnect and not self.connected():
+            await self.open()
         timeout = kwargs.pop('timeout', self.timeout)
         coro = f(self, *args, **kwargs)
         if timeout is not None:
             coro = asyncio.wait_for(coro, timeout)
         return await coro
+
+    return wrapper
+
+
+def raw_handle_read(f):
+    assert asyncio.iscoroutinefunction(f)
+
+    @functools.wraps(f)
+    async def wrapper(self, *args, **kwargs):
+        try:
+            reply = await f(self, *args, **kwargs)
+        except ConnectionError:
+            await self.close()
+            raise
+        if not reply and self.at_eof():
+            await self.close()
+        return reply
 
     return wrapper
 
@@ -170,6 +183,8 @@ class TCP:
         if self.connected():
             raise ConnectionError("socket already open")
         self._log.debug("open connection (#%d)", self.connection_counter + 1)
+        # make sure everything is clean before creating a new connection
+        await self.close()
         coro = open_connection(
             self.host,
             self.port,
@@ -206,20 +221,22 @@ class TCP:
         return len(self.reader) if self.connected() else 0
 
     def connected(self):
-        return self.reader is not None
+        return self.reader is not None and not self.at_eof()
 
     def at_eof(self):
-        return self.reader.at_eof()
+        return self.reader is not None and self.reader.at_eof()
 
+    @raw_handle_read
     async def _read(self, n=-1):
-        try:
-            reply = await self.reader.read(n)
-        except ConnectionError as err:
-            await self.close()
-            raise err
-        if not reply:
-            await self.close()
-        return reply
+        return await self.reader.read(n)
+
+    @raw_handle_read
+    async def _readexactly(self, n):
+        return await self.reader.readexactly(n)
+
+    @raw_handle_read
+    async def _readuntil(self, separator=b"\n"):
+        return await self.reader.readuntil(separator)
 
     async def _readline(self, eol=None):
         if eol is None:
@@ -241,6 +258,7 @@ class TCP:
             reply = await self._readline(eol=eol)
             if not reply:
                 break
+            replies.append(reply)
         return replies
 
     async def _write(self, data):
@@ -273,11 +291,11 @@ class TCP:
 
     @ensure_connection
     async def readexactly(self, n):
-        return await self.reader.readexactly(n)
+        return await self._readexactly(n)
 
     @ensure_connection
     async def readuntil(self, separator=b"\n"):
-        return await self.reader.readuntil(separator)
+        return await self._readuntil(separator)
 
     @ensure_connection
     async def readbuffer(self):

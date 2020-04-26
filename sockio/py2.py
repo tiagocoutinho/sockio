@@ -42,7 +42,6 @@ class Connection(object):
         self.sock = None
         self.fobj = None
 
-    @property
     def connected(self):
         return self.sock is not None
 
@@ -73,7 +72,7 @@ def ensure_connected(f):
     @functools.wraps(f)
     def wrapper(self, *args, **kwargs):
         with self._lock:
-            if not self.connected:
+            if not self.connected():
                 self._open()
                 return f(self, *args, **kwargs)
             else:
@@ -97,7 +96,7 @@ class TCP(object):
         self.connection_counter = 0
 
     def _open(self):
-        if self.connected:
+        if self.connected():
             raise ConnectionError("socket already open")
         self._log.debug("openning connection (#%d)...", self.connection_counter + 1)
         self.conn = Connection(self.host, self.port, timeout=self.timeout)
@@ -113,9 +112,8 @@ class TCP(object):
                 self.conn.close()
             self.conn = None
 
-    @property
     def connected(self):
-        return self.conn is not None and self.conn.connected
+        return self.conn is not None and self.conn.connected()
 
     @ensure_connected
     def write(self, data):
