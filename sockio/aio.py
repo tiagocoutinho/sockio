@@ -238,17 +238,11 @@ class TCP:
     async def _readuntil(self, separator=b"\n"):
         return await self.reader.readuntil(separator)
 
+    @raw_handle_read
     async def _readline(self, eol=None):
         if eol is None:
             eol = self.eol
-        try:
-            reply = await self.reader.readline(eol=eol)
-        except ConnectionError as err:
-            await self.close()
-            raise err
-        if not reply:
-            await self.close()
-        return reply
+        return await self.reader.readline(eol=eol)
 
     async def _readlines(self, n, eol=None):
         if eol is None:
