@@ -3,8 +3,13 @@ import asyncio.subprocess
 
 import pytest
 
-from sockio.aio import (TCP, ConnectionTimeoutError, ConnectionEOFError,
-                        LineStream, BlockStream)
+from sockio.aio import (
+    TCP,
+    ConnectionTimeoutError,
+    ConnectionEOFError,
+    LineStream,
+    BlockStream,
+)
 
 from conftest import IDN_REQ, IDN_REP, WRONG_REQ, WRONG_REP
 
@@ -86,7 +91,7 @@ async def test_write_readline_fail(unused_tcp_port):
 @pytest.mark.asyncio
 async def test_write_readline_error(aio_server, aio_tcp):
     with pytest.raises(ConnectionEOFError):
-        await aio_tcp.write_readline(b'kill\n')
+        await aio_tcp.write_readline(b"kill\n")
 
 
 @pytest.mark.asyncio

@@ -34,7 +34,7 @@ def ensure_connection(f):
     async def wrapper(self, *args, **kwargs):
         if self.auto_reconnect and not self.connected():
             await self.open()
-        timeout = kwargs.pop('timeout', self.timeout)
+        timeout = kwargs.pop("timeout", self.timeout)
         coro = f(self, *args, **kwargs)
         if timeout is not None:
             coro = asyncio.wait_for(coro, timeout)
@@ -42,8 +42,7 @@ def ensure_connection(f):
             return await coro
         except asyncio.TimeoutError:
             addr = str((self.host, self.port))
-            raise ConnectionTimeoutError(
-                '{} call timeout on {}'.format(name, addr))
+            raise ConnectionTimeoutError("{} call timeout on {}".format(name, addr))
 
     return wrapper
 
@@ -60,7 +59,7 @@ def raw_handle_read(f):
             raise
         if not reply:
             await self.close()
-            raise ConnectionEOFError('Connection closed by peer')
+            raise ConnectionEOFError("Connection closed by peer")
         return reply
 
     return wrapper
@@ -101,7 +100,7 @@ class StreamReader(asyncio.StreamReader):
             return e.partial
         except asyncio.LimitOverrunError as e:
             if self._buffer.startswith(eol, e.consumed):
-                del self._buffer[:e.consumed + len(eol)]
+                del self._buffer[: e.consumed + len(eol)]
             else:
                 self._buffer.clear()
             self._maybe_resume_transport()
@@ -246,7 +245,7 @@ class TCP:
         return LineStream(self)
 
     async def open(self, **kwargs):
-        connection_timeout = kwargs.get('timeout', self.connection_timeout)
+        connection_timeout = kwargs.get("timeout", self.connection_timeout)
         if self.connected():
             raise ConnectionError("socket already open")
         self._log.debug("open connection (#%d)", self.connection_counter + 1)
@@ -268,8 +267,7 @@ class TCP:
             self.reader, self.writer = await coro
         except asyncio.TimeoutError:
             addr = self.host, self.port
-            raise ConnectionTimeoutError(
-                'Connect call timeout on {}'.format(addr))
+            raise ConnectionTimeoutError("Connect call timeout on {}".format(addr))
 
         if self.on_connection_made is not None:
             try:
@@ -397,4 +395,3 @@ class TCP:
     def reset_input_buffer(self):
         if self.connected():
             self.reader.reset()
-

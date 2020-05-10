@@ -8,14 +8,14 @@ PY_37 = sys.version_info >= (3, 7)
 
 async def run(options):
     async def cb(reader, writer):
-        addr = writer.transport.get_extra_info('peername')
-        logging.info('client connected from %s', addr)
+        addr = writer.transport.get_extra_info("peername")
+        logging.info("client connected from %s", addr)
         try:
             for i in range(10):
-                msg = f'message {i}\n'
+                msg = f"message {i}\n"
                 writer.write(msg.encode())
                 await writer.drain()
-                logging.debug('send %r', msg)
+                logging.debug("send %r", msg)
                 await asyncio.sleep(1)
             writer.close()
             if PY_37:
@@ -23,39 +23,36 @@ async def run(options):
         except Exception:
             pass
 
-    server = await asyncio.start_server(
-        cb, host=options.host, port=options.port)
+    server = await asyncio.start_server(cb, host=options.host, port=options.port)
     host, port = server.sockets[0].getsockname()
-    logging.info('started accepting requests on %s:%d', host, port)
+    logging.info("started accepting requests on %s:%d", host, port)
     async with server:
         await server.serve_forever()
 
 
 def main(args=None):
     import argparse
+
     parser = argparse.ArgumentParser()
     log_level_choices = ["critical", "error", "warning", "info", "debug"]
     log_level_choices += [i.upper() for i in log_level_choices]
-    parser.add_argument('--host', default='0',
-                        help='SCPI bind address')
-    parser.add_argument('-p', '--port', type=int, help='SCPI server port')
-    parser.add_argument("--log-level", choices=log_level_choices,
-                        default="warning")
-    parser.add_argument('-d', '--debug', action='store_true')
+    parser.add_argument("--host", default="0", help="SCPI bind address")
+    parser.add_argument("-p", "--port", type=int, help="SCPI server port")
+    parser.add_argument("--log-level", choices=log_level_choices, default="warning")
+    parser.add_argument("-d", "--debug", action="store_true")
     options = parser.parse_args(args)
-    fmt = '%(asctime)-15s %(levelname)-5s: %(message)s'
+    fmt = "%(asctime)-15s %(levelname)-5s: %(message)s"
     logging.basicConfig(level=options.log_level.upper(), format=fmt)
     try:
         coro = run(options)
-        if hasattr(asyncio, 'run'):
+        if hasattr(asyncio, "run"):
             asyncio.run(coro)
         else:
             loop = asyncio.get_event_loop()
             loop.run_until_complete(coro)
     except KeyboardInterrupt:
-        logging.info('Ctrl-C pressed. Bailing out!')
+        logging.info("Ctrl-C pressed. Bailing out!")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
