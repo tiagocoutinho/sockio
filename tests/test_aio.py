@@ -1,12 +1,10 @@
-import os
-import sys
 import time
-import subprocess
 import asyncio.subprocess
 
 import pytest
 
-from sockio.aio import TCP, main, ConnectionTimeoutError, ConnectionEOFError
+from sockio.aio import (TCP, main, ConnectionTimeoutError, ConnectionEOFError,
+                        LineStream, BlockStream)
 
 from conftest import IDN_REQ, IDN_REP, WRONG_REQ, WRONG_REP
 
@@ -555,3 +553,29 @@ async def test_timeout(aio_tcp):
         assert dt > timeout and dt < (timeout + 0.05)
 
     await aio_tcp.close()
+
+
+@pytest.mark.asyncio
+async def test_line_stream(aio_tcp):
+    request = b"data? 2\n"
+    await aio_tcp.write(request)
+    i = 0
+    async for line in LineStream(aio_tcp):
+        assert line == b"1.2345 5.4321 12345.54321\n"
+        i += 1
+    assert i == 2
+    assert aio_tcp.connection_counter == 1
+    assert not aio_tcp.connected()
+
+
+@pytest.mark.asyncio
+async def test_block_stream(aio_tcp):
+    request = b"data? -5\n"
+    await aio_tcp.write(request)
+    i = 0
+    async for line in BlockStream(aio_tcp, 12):
+        assert line == "message {:04d}".format(i).encode()
+        i += 1
+    assert i == 5
+    assert aio_tcp.connection_counter == 1
+    assert not aio_tcp.connected()

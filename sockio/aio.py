@@ -144,6 +144,63 @@ async def open_connection(
     return reader, writer
 
 
+class BaseStream:
+    """Base asynchronous iterator stream helper for TCP connections"""
+
+    def __init__(self, tcp):
+        self.tcp = tcp
+
+    async def _read(self):
+        raise NotImplementedError
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            return await self._read()
+        except ConnectionEOFError:
+            raise StopAsyncIteration
+
+
+class LineStream(BaseStream):
+    """Line based asynchronous iterator stream helper for TCP connections"""
+
+    def __init__(self, tcp, eol=None):
+        super().__init__(tcp)
+        self.eol = eol
+
+    async def _read(self):
+        return await self.tcp.readline(eol=self.eol)
+
+
+class BlockStream(BaseStream):
+    """
+    Fixed based asynchronous iterator stream helper for TCP connections.
+
+    - If limit is an int the block is of fixed size
+      (TCP.readexactly semantics)
+    - If limit is a string, block ends when the limit string is
+      found (TCP.readuntil semantics)
+    """
+
+    def __init__(self, tcp, limit):
+        super().__init__(tcp)
+        self.limit = limit
+
+    async def _read(self):
+        try:
+            if isinstance(self.limit, int):
+                return await self.tcp.readexactly(self.limit)
+            else:
+                return await self.tcp.readuntil(self.limit)
+        except asyncio.IncompleteReadError as error:
+            if error.partial:
+                raise
+            else:
+                raise ConnectionEOFError()
+
+
 class TCP:
     def __init__(
         self,
@@ -186,14 +243,7 @@ class TCP:
                 self._log.warning("could not close stream: loop closed")
 
     def __aiter__(self):
-        return self
-
-    @ensure_connection
-    async def __anext__(self):
-        try:
-            return await self.readline()
-        except ConnectionEOFError:
-            raise StopAsyncIteration
+        return LineStream(self)
 
     async def open(self, **kwargs):
         connection_timeout = kwargs.get('timeout', self.connection_timeout)

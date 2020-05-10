@@ -29,10 +29,18 @@ async def server_coro(start_serving=True):
                     msg = b"OK\n"
                 elif data_l.startswith(b"data?"):
                     n = int(data.strip().split(b" ", 1)[-1])
-                    for i in range(n):
-                        await asyncio.sleep(0.05)
-                        writer.write(b"1.2345 5.4321 12345.54321\n")
-                        await writer.drain()
+                    if n > 0:
+                        for i in range(n):
+                            await asyncio.sleep(0.05)
+                            writer.write(b"1.2345 5.4321 12345.54321\n")
+                            await writer.drain()
+                    else:
+                        for i in range(abs(n)):
+                            await asyncio.sleep(0.05)
+                            msg = "message {:04d}".format(i).encode()
+                            assert len(msg) == 12
+                            writer.write(msg)
+                            await writer.drain()
                     writer.close()
                     await writer.wait_closed()
                     return
