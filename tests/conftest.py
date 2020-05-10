@@ -36,6 +36,10 @@ async def server_coro(start_serving=True):
                     writer.close()
                     await writer.wait_closed()
                     return
+                elif data_l.startswith(b"kill"):
+                    writer.close()
+                    await writer.wait_closed()
+                    return
                 elif not data:
                     writer.close()
                     await writer.wait_closed()

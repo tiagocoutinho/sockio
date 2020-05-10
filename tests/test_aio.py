@@ -6,7 +6,7 @@ import asyncio.subprocess
 
 import pytest
 
-from sockio.aio import TCP, main
+from sockio.aio import TCP, main, ConnectionTimeoutError, ConnectionEOFError
 
 from conftest import IDN_REQ, IDN_REP, WRONG_REQ, WRONG_REP
 
@@ -15,9 +15,11 @@ def test_socket_creation():
     sock = TCP("example.com", 34567)
     assert sock.host == "example.com"
     assert sock.port == 34567
+    assert sock.connection_timeout is None
     assert sock.timeout is None
     assert sock.auto_reconnect
     assert not sock.connected()
+    assert sock.in_waiting() == 0
     assert sock.connection_counter == 0
 
 
@@ -37,8 +39,8 @@ async def test_open_fail(unused_tcp_port):
 async def test_open_timeout():
     timeout = 0.1
     # TODO: Not cool to use an external connection
-    aio_tcp = TCP("www.google.com", 81, timeout=timeout)
-    with pytest.raises(asyncio.TimeoutError):
+    aio_tcp = TCP("www.google.com", 81, connection_timeout=timeout)
+    with pytest.raises(ConnectionTimeoutError):
         start = time.time()
         try:
             await aio_tcp.open()
@@ -48,7 +50,7 @@ async def test_open_timeout():
 
     # TODO: Not cool to use an external connection
     aio_tcp = TCP("www.google.com", 82)
-    with pytest.raises(asyncio.TimeoutError):
+    with pytest.raises(ConnectionTimeoutError):
         start = time.time()
         try:
             await aio_tcp.open(timeout=timeout)
@@ -66,6 +68,7 @@ async def test_write_fail(unused_tcp_port):
     with pytest.raises(ConnectionRefusedError):
         await sock.write(IDN_REQ)
     assert not sock.connected()
+    assert sock.in_waiting() == 0
     assert sock.connection_counter == 0
 
 
@@ -78,7 +81,14 @@ async def test_write_readline_fail(unused_tcp_port):
     with pytest.raises(ConnectionRefusedError):
         await sock.write_readline(IDN_REQ)
     assert not sock.connected()
+    assert sock.in_waiting() == 0
     assert sock.connection_counter == 0
+
+
+@pytest.mark.asyncio
+async def test_write_readline_error(aio_server, aio_tcp):
+    with pytest.raises(ConnectionEOFError):
+        await aio_tcp.write_readline(b'kill\n')
 
 
 @pytest.mark.asyncio
@@ -403,6 +413,8 @@ async def test_readline(aio_tcp):
         assert aio_tcp.connected()
         assert aio_tcp.connection_counter == 1
         assert answer is None
+        await asyncio.sleep(0.05)
+        assert aio_tcp.in_waiting() > 0
         coro = aio_tcp.readline()
         assert asyncio.iscoroutine(coro)
         reply = await coro
@@ -534,7 +546,7 @@ async def test_timeout(aio_tcp):
     assert dt < timeout
 
     timeout = 0.09
-    with pytest.raises(asyncio.TimeoutError):
+    with pytest.raises(ConnectionTimeoutError):
         start = time.time()
         try:
             await aio_tcp.write_readline(b"sleep 1\n", timeout=timeout)

@@ -18,8 +18,17 @@ DEFAULT_LIMIT = 2 ** 20  # 1Mb
 log = logging.getLogger("sockio")
 
 
+class ConnectionEOFError(ConnectionError):
+    pass
+
+
+class ConnectionTimeoutError(ConnectionError):
+    pass
+
+
 def ensure_connection(f):
     assert asyncio.iscoroutinefunction(f)
+    name = f.__name__
 
     @functools.wraps(f)
     async def wrapper(self, *args, **kwargs):
@@ -29,7 +38,12 @@ def ensure_connection(f):
         coro = f(self, *args, **kwargs)
         if timeout is not None:
             coro = asyncio.wait_for(coro, timeout)
-        return await coro
+        try:
+            return await coro
+        except asyncio.TimeoutError:
+            addr = str((self.host, self.port))
+            raise ConnectionTimeoutError(
+                '{} call timeout on {}'.format(name, addr))
 
     return wrapper
 
@@ -44,8 +58,9 @@ def raw_handle_read(f):
         except ConnectionError:
             await self.close()
             raise
-        if not reply and self.at_eof():
+        if not reply:
             await self.close()
+            raise ConnectionEOFError('Connection closed by peer')
         return reply
 
     return wrapper
@@ -142,7 +157,8 @@ class TCP:
         buffer_size=DEFAULT_LIMIT,
         no_delay=True,
         tos=IPTOS_LOWDELAY,
-        timeout=None
+        connection_timeout=None,
+        timeout=None,
     ):
         self.host = host
         self.port = port
@@ -155,6 +171,7 @@ class TCP:
         self.on_eof_received = on_eof_received
         self.no_delay = no_delay
         self.tos = tos
+        self.connection_timeout = connection_timeout
         self.timeout = timeout
         self.reader = None
         self.writer = None
@@ -173,13 +190,13 @@ class TCP:
 
     @ensure_connection
     async def __anext__(self):
-        val = await self.reader.readline()
-        if val == b"":
+        try:
+            return await self.readline()
+        except ConnectionEOFError:
             raise StopAsyncIteration
-        return val
 
     async def open(self, **kwargs):
-        timeout = kwargs.get('timeout', self.timeout)
+        connection_timeout = kwargs.get('timeout', self.connection_timeout)
         if self.connected():
             raise ConnectionError("socket already open")
         self._log.debug("open connection (#%d)", self.connection_counter + 1)
@@ -194,9 +211,16 @@ class TCP:
             no_delay=self.no_delay,
             tos=self.tos,
         )
-        if timeout is not None:
-            coro = asyncio.wait_for(coro, timeout)
-        self.reader, self.writer = await coro
+        if connection_timeout is not None:
+            coro = asyncio.wait_for(coro, connection_timeout)
+
+        try:
+            self.reader, self.writer = await coro
+        except asyncio.TimeoutError:
+            addr = self.host, self.port
+            raise ConnectionTimeoutError(
+                'Connect call timeout on {}'.format(addr))
+
         if self.on_connection_made is not None:
             try:
                 res = self.on_connection_made()
@@ -250,8 +274,6 @@ class TCP:
         replies = []
         for i in range(n):
             reply = await self._readline(eol=eol)
-            if not reply:
-                break
             replies.append(reply)
         return replies
 
