@@ -22,7 +22,7 @@ Base implementation written in asyncio with support for different concurrency mo
 
 ## Installation
 
-From within your favourite python environment:
+From within your favorite python environment:
 
 ```console
 pip install sockio
@@ -94,6 +94,18 @@ when creating a TCP object:
   if favor of other concurrent communications. Can be disabled with
   `TCP(tos=IPTOS_NORMAL)`
 
+### Price to pay
+
+Before going in detail about the features, note that this abstraction comes
+with a price. Intentionally, when comparing with low level socket API, the
+following features are no longer available:
+
+1. The cability of controlling the two ends of the socket independently
+   (ex: close the write end)
+2. While the low level `socket.recv()` returns empty string when EOF is reached,
+   the TCP class raises `ConnectionEOFError` instead and closes both ends of
+   the connection.
+3. Clever low level operations like `os.dup()`, make socket non-blocking
 
 ### REQ-REP semantics
 
