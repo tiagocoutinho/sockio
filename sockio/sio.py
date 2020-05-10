@@ -104,23 +104,3 @@ class EventLoop:
 
 DefaultEventLoop = EventLoop()
 TCP = DefaultEventLoop.tcp
-
-
-def run(options):
-    DefaultEventLoop.loop.set_debug(options.debug)
-    sock = TCP(options.host, options.port)
-    request = options.request
-    lines = request.count("\n")
-    for r in sock.write_readlines(request.encode(), lines):
-        print(r)
-
-
-def main(args=None):
-    from .aio import parse_args
-
-    options = parse_args(args=args)
-    run(options)
-
-
-if __name__ == "__main__":
-    main()

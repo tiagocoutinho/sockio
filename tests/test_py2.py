@@ -126,7 +126,7 @@ def test_writelines(py2_tcp):
 
 def test_readline(py2_tcp):
     for request, expected in [(IDN_REQ, IDN_REP), (WRONG_REQ, WRONG_REP)]:
-        answer = py2_tcp.write(request)
+        py2_tcp.write(request)
         assert py2_tcp.connected()
         assert py2_tcp.connection_counter == 1
         reply = py2_tcp.readline()
@@ -139,7 +139,7 @@ def test_readlines(py2_tcp):
         (2 * IDN_REQ, 2 * [IDN_REP]),
         (IDN_REQ + WRONG_REQ, [IDN_REP, WRONG_REP]),
     ]:
-        answer = py2_tcp.write(request)
+        py2_tcp.write(request)
         assert py2_tcp.connected()
         assert py2_tcp.connection_counter == 1
         gen = py2_tcp.readlines(len(expected))
@@ -149,7 +149,7 @@ def test_readlines(py2_tcp):
 
 def test_read(py2_tcp):
     for request, expected in [(IDN_REQ, IDN_REP), (WRONG_REQ, WRONG_REP)]:
-        answer = py2_tcp.write(request)
+        py2_tcp.write(request)
         assert py2_tcp.connected()
         assert py2_tcp.connection_counter == 1
         reply, n = b"", 0

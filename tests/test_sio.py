@@ -1,6 +1,6 @@
 import pytest
 
-from sockio.sio import TCP, main
+from sockio.sio import TCP
 
 from conftest import IDN_REQ, IDN_REP, WRONG_REQ, WRONG_REP
 
@@ -9,7 +9,7 @@ def test_socket_creation():
     sock = TCP("example.com", 34567)
     assert sock.host == "example.com"
     assert sock.port == 34567
-    assert sock.auto_reconnect == True
+    assert sock.auto_reconnect is True
     assert not sock.connected()
     assert sock.connection_counter == 0
 
@@ -253,10 +253,3 @@ def test_read(sio_tcp):
             reply += sio_tcp.read(1024)
             n += 1
         assert expected == reply
-
-
-def test_cli(sio_server, capsys):
-    _, port = sio_server.sockets[0].getsockname()
-    main(["--port", str(port)])
-    captured = capsys.readouterr()
-    assert captured.out == repr(IDN_REP) + "\n"

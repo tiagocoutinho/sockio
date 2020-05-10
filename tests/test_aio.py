@@ -3,7 +3,7 @@ import asyncio.subprocess
 
 import pytest
 
-from sockio.aio import (TCP, main, ConnectionTimeoutError, ConnectionEOFError,
+from sockio.aio import (TCP, ConnectionTimeoutError, ConnectionEOFError,
                         LineStream, BlockStream)
 
 from conftest import IDN_REQ, IDN_REP, WRONG_REQ, WRONG_REP
@@ -515,14 +515,6 @@ async def test_stream(aio_tcp):
     assert i == 2
     assert aio_tcp.connection_counter == 1
     assert not aio_tcp.connected()
-
-
-@pytest.mark.asyncio
-async def test_cli(aio_server, capsys):
-    _, port = aio_server.sockets[0].getsockname()
-    await main(["--port", str(port)])
-    captured = capsys.readouterr()
-    assert captured.out == repr(IDN_REP) + "\n"
 
 
 @pytest.mark.asyncio
