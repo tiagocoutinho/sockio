@@ -282,12 +282,14 @@ class TCP:
         self.connection_counter += 1
 
     async def close(self):
-        if self.writer is not None:
-            self.writer.close()
-            if PY_37:
-                await self.writer.wait_closed()
-        self.reader = None
-        self.writer = None
+        try:
+            if self.writer is not None:
+                self.writer.close()
+                if PY_37:
+                    await self.writer.wait_closed()
+        finally:
+            self.reader = None
+            self.writer = None
 
     def in_waiting(self):
         return len(self.reader) if self.connected() else 0
