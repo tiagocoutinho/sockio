@@ -40,9 +40,9 @@ def ensure_connection(f):
             coro = asyncio.wait_for(coro, timeout)
         try:
             return await coro
-        except asyncio.TimeoutError:
-            addr = str((self.host, self.port))
-            raise ConnectionTimeoutError("{} call timeout on {}".format(name, addr))
+        except asyncio.TimeoutError as error:
+            msg = "{} call timeout on '{}:{}'".format(name, self.host, self.port)
+            raise ConnectionTimeoutError(msg) from error
 
     return wrapper
 
@@ -124,6 +124,7 @@ async def open_connection(
     on_eof_received=None,
     no_delay=True,
     tos=IPTOS_LOWDELAY,
+    keep_alive=None
 ):
     if loop is None:
         loop = asyncio.get_event_loop()
@@ -140,6 +141,23 @@ async def open_connection(
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     if hasattr(socket, "IP_TOS"):
         sock.setsockopt(socket.SOL_IP, socket.IP_TOS, tos)
+    if keep_alive is not None and hasattr(socket, "SO_KEEPALIVE"):
+        if isinstance(keep_alive, (int, bool)):
+            keep_alive = 1 if keep_alive in {1, True} else False
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, keep_alive)
+        else:
+            active = keep_alive.get('active')
+            idle = keep_alive.get('idle')  # aka keepalive_time
+            interval = keep_alive.get('interval')  # aka keepalive_intvl
+            retry = keep_alive.get('retry')  # aka keepalive_probes
+            if active is not None:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, active)
+            if idle is not None:
+                sock.setsockopt(socket.SOL_TCP, socket.TCP_KEEPIDLE, idle)
+            if interval is not None:
+                sock.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, interval)
+            if retry is not None:
+                sock.setsockopt(socket.SOL_TCP, socket.TCP_KEEPCNT, retry)
     return reader, writer
 
 
@@ -215,6 +233,7 @@ class TCP:
         tos=IPTOS_LOWDELAY,
         connection_timeout=None,
         timeout=None,
+        keep_alive=None,
     ):
         self.host = host
         self.port = port
@@ -229,6 +248,7 @@ class TCP:
         self.tos = tos
         self.connection_timeout = connection_timeout
         self.timeout = timeout
+        self.keep_alive = keep_alive
         self.reader = None
         self.writer = None
         self._log = log.getChild("TCP({}:{})".format(host, port))
@@ -259,6 +279,7 @@ class TCP:
             on_eof_received=self.on_eof_received,
             no_delay=self.no_delay,
             tos=self.tos,
+            keep_alive=self.keep_alive
         )
         if connection_timeout is not None:
             coro = asyncio.wait_for(coro, connection_timeout)
