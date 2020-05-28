@@ -54,7 +54,7 @@ def raw_handle_read(f):
     async def wrapper(self, *args, **kwargs):
         try:
             reply = await f(self, *args, **kwargs)
-        except ConnectionError:
+        except OSError:
             await self.close()
             raise
         if not reply:
