@@ -496,6 +496,19 @@ async def test_read(aio_tcp):
 
 
 @pytest.mark.asyncio
+async def test_parallel_rw(aio_tcp):
+    async def wr(request, expected_reply):
+        reply = await aio_tcp.write_readline(request)
+        return request, reply, expected_reply
+
+    args = 10 * [(IDN_REQ, IDN_REP), (WRONG_REQ, WRONG_REP)]
+    coros = [wr(*arg) for arg in args]
+    result = await asyncio.gather(*coros)
+    for req, reply, expected in result:
+        assert reply == expected, "Failed request {}".format(req)
+
+
+@pytest.mark.asyncio
 async def test_parallel(aio_tcp):
     async def wr(request, expected_reply):
         await aio_tcp.write(request)
