@@ -318,12 +318,13 @@ class TCP:
             eol = self.eol
         return await self.reader.readline(eol=eol)
 
+    @raw_handle_read
     async def _readlines(self, n, eol=None):
         if eol is None:
             eol = self.eol
         replies = []
         for i in range(n):
-            reply = await self._readline(eol=eol)
+            reply = await self.reader.readline(eol=eol)
             replies.append(reply)
         return replies
 
