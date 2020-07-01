@@ -136,16 +136,18 @@ equipment during the night (planet Earth thanks you for saving energy!).
 
 ### Timeout
 
-The TCP constructor provides a timeout parameter. It will be taken into
-account when performing an I/O operation (open, read, write, read_writeline,
-etc):
+The TCP constructor provides a `connection_timeout` that is used when the
+connection is open and `timeout` parameter that is taken into account
+when performing any data I/O operation (read, write, read_writeline,
+etc).
+By default, they are both None, meaning infinite timeout.
 
 ```python
-sock = TCP('acme.example.com', 5000, timeout=1)
+sock = TCP('acme.example.com', 5000, connection_timeout=0.1, timeout=1)
 ```
 
-Additionally, you can override the object timeout on each I/O method call
-by providing an alternative timeout parameter:
+Additionally, you can override the object timeout on each data I/O method
+call by providing an alternative timeout parameter:
 
 ```python
 sock = TCP('acme.example.com', 5000, timeout=1)
