@@ -45,6 +45,8 @@ class Connection(object):
     def connected(self):
         return self.sock is not None
 
+    is_open = property(connected)
+
     @ensure_closed_on_error
     def readline(self):
         data = self.fobj.readline()
@@ -114,6 +116,8 @@ class TCP(object):
 
     def connected(self):
         return self.conn is not None and self.conn.connected()
+
+    is_open = property(connected)
 
     @ensure_connected
     def write(self, data):

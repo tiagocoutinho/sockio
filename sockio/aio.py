@@ -318,6 +318,8 @@ class TCP:
     def connected(self):
         return self.reader is not None and not self.at_eof()
 
+    is_open = property(connected)
+
     def at_eof(self):
         return self.reader is not None and self.reader.at_eof()
 
