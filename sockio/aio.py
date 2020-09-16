@@ -3,6 +3,7 @@ import socket
 import asyncio
 import logging
 import functools
+import urllib.parse
 
 
 PY_37 = sys.version_info >= (3, 7)
@@ -66,6 +67,7 @@ def raw_handle_read(f):
 
 
 class StreamReaderProtocol(asyncio.StreamReaderProtocol):
+
     def connection_lost(self, exc):
         result = super().connection_lost(exc)
         self._exec_callback("connection_lost_cb", exc)
@@ -89,6 +91,7 @@ class StreamReaderProtocol(asyncio.StreamReaderProtocol):
 
 
 class StreamReader(asyncio.StreamReader):
+
     async def readline(self, eol=b"\n"):
         # This implementation is a copy of the asyncio.StreamReader.readline()
         # with the purpose of supporting different EOL characters.
@@ -259,7 +262,7 @@ class TCP:
             if loop is not None and not loop.is_closed():
                 self.writer.close()
             else:
-                self._log.warning("could not close stream: loop closed")
+                self._log.info("could not close stream: loop closed")
 
     def __aiter__(self):
         return LineStream(self)
@@ -421,3 +424,13 @@ class TCP:
     def reset_input_buffer(self):
         if self.connected():
             self.reader.reset()
+
+
+def socket_for_url(url, *args, **kwargs):
+    addr = urllib.parse.urlparse(url)
+    scheme = addr.scheme
+    if scheme == "tcp":
+        return TCP(addr.hostname, addr.port, *args, **kwargs)
+    raise ValueError("unsupported async scheme {!r} for {}".format(scheme, url))
+
+

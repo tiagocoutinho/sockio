@@ -1,6 +1,7 @@
 import asyncio
 import functools
 import threading
+import urllib.parse
 
 from . import aio
 
@@ -104,3 +105,11 @@ class EventLoop:
 
 DefaultEventLoop = EventLoop()
 TCP = DefaultEventLoop.tcp
+
+
+def socket_for_url(url, *args, **kwargs):
+    addr = urllib.parse.urlparse(url)
+    scheme = addr.scheme
+    if scheme == "tcp":
+        return TCP(addr.hostname, addr.port, *args, **kwargs)
+    raise ValueError("unsupported sync scheme {!r} for {}".format(scheme, url))
