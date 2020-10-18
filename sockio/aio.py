@@ -117,6 +117,28 @@ class StreamReader(asyncio.StreamReader):
         self._buffer.clear()
 
 
+def configure_socket(sock, no_delay=True, tos=IPTOS_LOWDELAY, keep_alive=None):
+    if hasattr(socket, "TCP_NODELAY") and no_delay:
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    if hasattr(socket, "IP_TOS"):
+        sock.setsockopt(socket.SOL_IP, socket.IP_TOS, tos)
+    if keep_alive is not None and hasattr(socket, "SO_KEEPALIVE"):
+        if isinstance(keep_alive, (int, bool)):
+            keep_alive = dict(active=1 if keep_alive in {1, True} else False)
+        active = keep_alive.get('active')
+        idle = keep_alive.get('idle')  # aka keepalive_time
+        interval = keep_alive.get('interval')  # aka keepalive_intvl
+        retry = keep_alive.get('retry')  # aka keepalive_probes
+        if active is not None:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, active)
+        if idle is not None:
+            sock.setsockopt(socket.SOL_TCP, socket.TCP_KEEPIDLE, idle)
+        if interval is not None:
+            sock.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, interval)
+        if retry is not None:
+            sock.setsockopt(socket.SOL_TCP, socket.TCP_KEEPCNT, retry)
+
+
 async def open_connection(
     host=None,
     port=None,
@@ -140,27 +162,7 @@ async def open_connection(
     )
     writer = asyncio.StreamWriter(transport, protocol, reader, loop)
     sock = writer.transport.get_extra_info("socket")
-    if hasattr(socket, "TCP_NODELAY") and no_delay:
-        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-    if hasattr(socket, "IP_TOS"):
-        sock.setsockopt(socket.SOL_IP, socket.IP_TOS, tos)
-    if keep_alive is not None and hasattr(socket, "SO_KEEPALIVE"):
-        if isinstance(keep_alive, (int, bool)):
-            keep_alive = 1 if keep_alive in {1, True} else False
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, keep_alive)
-        else:
-            active = keep_alive.get('active')
-            idle = keep_alive.get('idle')  # aka keepalive_time
-            interval = keep_alive.get('interval')  # aka keepalive_intvl
-            retry = keep_alive.get('retry')  # aka keepalive_probes
-            if active is not None:
-                sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, active)
-            if idle is not None:
-                sock.setsockopt(socket.SOL_TCP, socket.TCP_KEEPIDLE, idle)
-            if interval is not None:
-                sock.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, interval)
-            if retry is not None:
-                sock.setsockopt(socket.SOL_TCP, socket.TCP_KEEPCNT, retry)
+    configure_socket(sock, no_delay=no_delay, tos=tos, keep_alive=keep_alive)
     return reader, writer
 
 
