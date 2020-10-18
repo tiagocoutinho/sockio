@@ -1,30 +1,13 @@
 import sys
 import socket
 import asyncio
-import logging
 import functools
 import urllib.parse
 
+from .common import IPTOS_LOWDELAY, DEFAULT_LIMIT, ConnectionEOFError, ConnectionTimeoutError, log
+
 
 PY_37 = sys.version_info >= (3, 7)
-
-IPTOS_NORMAL = 0x0
-IPTOS_LOWDELAY = 0x10
-IPTOS_THROUGHPUT = 0x08
-IPTOS_RELIABILITY = 0x04
-IPTOS_MINCOST = 0x02
-DEFAULT_LIMIT = 2 ** 20  # 1Mb
-
-
-log = logging.getLogger("sockio")
-
-
-class ConnectionEOFError(ConnectionError):
-    pass
-
-
-class ConnectionTimeoutError(ConnectionError):
-    pass
 
 
 def ensure_connection(f):
