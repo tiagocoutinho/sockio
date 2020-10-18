@@ -33,7 +33,7 @@ setup(
         "Documentation": "https://tiagocoutinho.github.io/sockio/",
         "Source": "https://github.com/tiagocoutinho/sockio/",
     },
-    version="0.11.0",
+    version="0.12.0",
     python_requires=">=2.7",
     zip_safe=True,
 )
