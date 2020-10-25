@@ -6,7 +6,7 @@ import pytest
 import sockio.aio
 import sockio.sio
 import sockio.py2
-
+import sockio.socket
 
 IDN_REQ, IDN_REP = b"*idn?\n", b"ACME, bla ble ble, 1234, 5678\n"
 WRONG_REQ, WRONG_REP = b"wrong question\n", b"ERROR: unknown command\n"
@@ -89,6 +89,16 @@ async def aio_tcp(aio_server):
     sock = sockio.aio.TCP(*addr)
     yield sock
     await sock.close()
+
+
+@pytest.fixture
+async def aio_socket(aio_server):
+    addr = aio_server.sockets[0].getsockname()
+    sock = sockio.socket.TCP(*addr)
+    try:
+        yield sock
+    finally:
+        sock.close()
 
 
 @pytest.fixture
