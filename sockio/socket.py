@@ -1,3 +1,5 @@
+import os
+import errno
 import socket
 import asyncio
 import functools
@@ -67,6 +69,16 @@ def ensure_connection(f):
     return wrapper
 
 
+async def stream_reader(sock):
+    loop = asyncio.get_event_loop()
+    block_size = 2**14
+    while True:
+        data = await loop.sock_recv(sock, block_size)
+        if not data:
+            break
+        yield data
+
+
 class RawTCP:
 
     def __init__(
@@ -101,24 +113,23 @@ class RawTCP:
 
     async def _read_loop(self):
         loop = asyncio.get_event_loop()
+        sock = self._sock
         try:
-            while True:
-                data = await loop.sock_recv(self._sock, 2**14)
-                if not data:  # EOF
-                    raise ConnectionEOFError("EOF reached")
+            async for data in stream_reader(sock):
                 self._log.debug("received %r", data)
                 self._read_buffer += data
                 self._read_event.set()
+            raise ConnectionEOFError("reached eof")
         except OSError as error:
-            self._log.debug("OSError: %r", error)
             self._read_error = error
+        finally:
             self._read_task = None
             self._read_event.set()
-            self.close()
+            sock.close()
 
-    def _consume(self, size):
+    def _consume(self, size=None):
         data = self._read_buffer[:size]
-        self._read_buffer = self._read_buffer[size:]
+        self._read_buffer = b"" if size is None else self._read_buffer[size:]
         return data
 
     async def _wait_for_data(self):
@@ -128,6 +139,9 @@ class RawTCP:
             raise self._read_error
 
     async def open(self):
+        if self.connected():
+            code = errno.EISCONN
+            raise OSError(code, os.strerror(code))
         self._sock = await open_connection(
             self.host,
             self.port,
@@ -138,9 +152,8 @@ class RawTCP:
         self._read_task = asyncio.create_task(self._read_loop())
 
     def close(self):
-        if self._sock:
-            self._sock.close()
-            self._sock = None
+        if self._read_task:
+            self._read_task.cancel()
 
     def connected(self):
         return self._sock is not None and self._read_task is not None
@@ -152,6 +165,27 @@ class RawTCP:
         loop = asyncio.get_event_loop()
         await loop.sock_sendall(self._sock, data)
 
+    async def writelines(self, lines):
+        data = b"".join(lines)
+        return await self.write(data)
+
+    async def read(self, n=-1):
+        if n == -1:
+            while True:
+                try:
+                    await self._wait_for_data()
+                except ConnectionEOFError:
+                    return self._consume()
+        else:
+            if not self.in_waiting():
+                await self._wait_for_data()
+            return self._consume(n)
+
+    async def readexactly(self, n):
+        while self.in_waiting() < n:
+            await self._wait_for_data()
+        return self._consume(n)
+
     async def readline(self, eol=None):
         if eol is None:
             eol = self.eol
@@ -162,10 +196,13 @@ class RawTCP:
         size += len(eol)
         return self._consume(size)
 
-    async def readexactly(self, size):
-        while len(buffer) < size:
-            await self._wait_for_data()
-        return self._consume(size)
+    async def readlines(self, n, eol=None):
+        if eol is None:
+            eol = self.eol
+        return [
+            await self.readline(eol=eol)
+            for i in range(n)
+        ]
 
 
 class TCP:
@@ -258,10 +295,41 @@ class TCP:
         return await self._sock.write(data)
 
     @ensure_connection
+    async def writelines(self, lines):
+        return await self._sock.writelines(lines)
+
+    @ensure_connection
+    async def read(self, n=-1):
+        return await self._sock.read(n=n)
+
+    @ensure_connection
+    async def readexactly(self, n):
+        return await self._sock.readexactly(n)
+
+    @ensure_connection
+    async def readuntil(self, separator=b"\n"):
+        return await self._sock.readline(eol=separator)
+
     async def readline(self, eol=None):
         return await self._sock.readline(eol=eol)
+
+    @ensure_connection
+    async def readlines(self, n, eol=None):
+        return await self._sock.readlines(n, eol=eol)
 
     @ensure_connection
     async def write_readline(self, data, eol=None):
         await self._sock.write(data)
         return await self._sock.readline(eol=eol)
+
+    @ensure_connection
+    async def write_readlines(self, data, n, eol=None):
+        await self._sock.write(data)
+        return await self._sock.readlines(n, eol=eol)
+
+    @ensure_connection
+    async def writelines_readlines(self, lines, n=None, eol=None):
+        if n is None:
+            n = len(lines)
+        await self._sock.writelines(lines)
+        return await self._sock.readlines(n, eol=eol)
