@@ -76,6 +76,19 @@ async def test_write_fail(unused_tcp_port):
 
 
 @pytest.mark.asyncio
+async def test_write_read_fail(unused_tcp_port):
+    sock = TCP("0", unused_tcp_port)
+    assert not sock.connected()
+    assert sock.connection_counter == 0
+
+    with pytest.raises(ConnectionRefusedError):
+        await sock.write_read(IDN_REQ)
+    assert not sock.connected()
+    assert sock.in_waiting() == 0
+    assert sock.connection_counter == 0
+
+
+@pytest.mark.asyncio
 async def test_write_readline_fail(unused_tcp_port):
     sock = TCP("0", unused_tcp_port)
     assert not sock.connected()
@@ -342,6 +355,17 @@ async def test_eof_callback(aio_server):
     assert state["made"] == 1
     assert state["lost"] == 0
     assert state["eof"] == 1
+
+
+@pytest.mark.asyncio
+async def test_write_read(aio_tcp):
+    for request, expected in [(IDN_REQ, IDN_REP), (WRONG_REQ, WRONG_REP)]:
+        coro = aio_tcp.write_read(request, 1024)
+        assert asyncio.iscoroutine(coro)
+        reply = await coro
+        assert aio_tcp.connected()
+        assert aio_tcp.connection_counter == 1
+        assert expected == reply
 
 
 @pytest.mark.asyncio

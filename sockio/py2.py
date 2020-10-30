@@ -140,6 +140,11 @@ class TCP(object):
         return self.conn.writelines(lines)
 
     @ensure_connected
+    def write_read(self, data, n=-1):
+        self.conn.write(data)
+        return self.conn.read(n)
+
+    @ensure_connected
     def write_readline(self, data):
         self.conn.write(data)
         return self.conn.readline()
