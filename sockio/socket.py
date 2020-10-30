@@ -4,8 +4,6 @@ import socket
 import asyncio
 import functools
 
-from async_timeout import timeout
-
 from .common import IPTOS_LOWDELAY, ConnectionEOFError, ConnectionTimeoutError, log
 
 
@@ -79,6 +77,16 @@ async def stream_reader(sock):
         yield data
 
 
+async def run_callback(cb):
+    if cb is None:
+        return
+    if asyncio.iscoroutinefunction(cb):
+        res = await cb()
+    else:
+        res = cb()
+    return res
+
+
 class RawTCP:
 
     def __init__(
@@ -89,6 +97,9 @@ class RawTCP:
         no_delay=True,
         tos=IPTOS_LOWDELAY,
         keep_alive=None,
+        on_connection_made=None,
+        on_connection_lost=None,
+        on_eof_received=None,
     ):
         self.host = host
         self.port = port
@@ -101,15 +112,24 @@ class RawTCP:
         self._read_error = None
         self._read_task = None
         self._read_event = asyncio.Event()
+        self.on_connection_made = on_connection_made
+        self.on_connection_lost = on_connection_lost
+        self.on_eof_received = on_eof_received
         self._log = log.getChild("RawTCP({}:{})".format(host, port))
 
     def __del__(self):
-        self.close()
+        self._close()
 
     def __repr__(self):
         return "{}(host={}, port={}, connected={})".format(
             type(self).__name__, self.host, self.port, self.connected()
         )
+
+    async def _run_callback(self, cb):
+        try:
+            return await run_callback(cb)
+        except Exception as error:
+            self._log.error("Error running %s: %r", cb.__name__, error)
 
     async def _read_loop(self):
         loop = asyncio.get_event_loop()
@@ -120,12 +140,17 @@ class RawTCP:
                 self._read_buffer += data
                 self._read_event.set()
             raise ConnectionEOFError("reached eof")
+        except ConnectionEOFError as error:
+            self._read_error = error
+            await self._run_callback(self.on_eof_received)
         except OSError as error:
+            self._read_error = error
+            await self._run_callback(self.on_connection_lost)
+        except Exception as error:
             self._read_error = error
         finally:
             self._read_task = None
             self._read_event.set()
-            sock.close()
 
     def _consume(self, size=None):
         data = self._read_buffer[:size]
@@ -137,6 +162,10 @@ class RawTCP:
         self._read_event.clear()
         if self._read_error is not None:
             raise self._read_error
+
+    def _close(self):
+        if self._sock is not None:
+            self._sock.close()
 
     async def open(self):
         if self.connected():
@@ -151,9 +180,14 @@ class RawTCP:
         )
         self._read_task = asyncio.create_task(self._read_loop())
 
-    def close(self):
+    async def close(self):
+        self._close()
         if self._read_task:
             self._read_task.cancel()
+            try:
+                await self._read_task
+            except asyncio.CancelledError:
+                pass
 
     def connected(self):
         return self._sock is not None and self._read_task is not None
@@ -260,9 +294,9 @@ class TCP:
     def connected(self):
         return self._sock is not None and self._sock.connected()
 
-    def close(self):
+    async def close(self):
         if self._sock:
-            self._sock.close()
+            await self._sock.close()
             self._sock = None
 
     async def open(self, **kwargs):
@@ -277,6 +311,9 @@ class TCP:
             no_delay=self.no_delay,
             tos=self.tos,
             keep_alive=self.keep_alive,
+            on_connection_made=self.on_connection_made,
+            on_connection_lost=self.on_connection_lost,
+            on_eof_received=self.on_eof_received
         )
         coro = sock.open()
         if connection_timeout is not None:

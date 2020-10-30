@@ -98,7 +98,7 @@ async def aio_socket(aio_server):
     try:
         yield sock
     finally:
-        sock.close()
+        await sock.close()
 
 
 @pytest.fixture
