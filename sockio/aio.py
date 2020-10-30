@@ -390,6 +390,11 @@ class TCP:
         return await self._writelines(lines)
 
     @ensure_connection
+    async def write_read(self, data, n=-1):
+        await self._write(data)
+        return await self._read(n=n)
+
+    @ensure_connection
     async def write_readline(self, data, eol=None):
         await self._write(data)
         return await self._readline(eol=eol)
@@ -417,5 +422,3 @@ def socket_for_url(url, *args, **kwargs):
     if scheme == "tcp":
         return TCP(addr.hostname, addr.port, *args, **kwargs)
     raise ValueError("unsupported async scheme {!r} for {}".format(scheme, url))
-
-

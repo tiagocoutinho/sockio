@@ -36,6 +36,17 @@ def test_write_fail(unused_tcp_port):
     assert sock.connection_counter == 0
 
 
+def test_write_read_fail(unused_tcp_port):
+    sock = TCP("0", unused_tcp_port)
+    assert not sock.connected()
+    assert sock.connection_counter == 0
+
+    with pytest.raises(ConnectionRefusedError):
+        sock.write_read(IDN_REQ)
+    assert not sock.connected()
+    assert sock.connection_counter == 0
+
+
 def test_write_readline_fail(unused_tcp_port):
     sock = TCP("0", unused_tcp_port)
     assert not sock.connected()
@@ -141,6 +152,14 @@ def test_callbacks(sio_server):
     assert state["made"] == 2
     assert state["lost"] == 2
     assert state["eof"] == 0
+
+
+def test_write_read(sio_tcp):
+    for request, expected in [(IDN_REQ, IDN_REP), (WRONG_REQ, WRONG_REP)]:
+        reply = sio_tcp.write_read(request, 1024)
+        assert sio_tcp.connected()
+        assert sio_tcp.connection_counter == 1
+        assert expected == reply
 
 
 def test_write_readline(sio_tcp):
