@@ -35,7 +35,7 @@ setup(
         "Documentation": "https://tiagocoutinho.github.io/sockio/",
         "Source": "https://github.com/tiagocoutinho/sockio/",
     },
-    version="0.13.0",
+    version="0.14.0",
     python_requires=">=2.7",
     zip_safe=True,
 )
