@@ -2,12 +2,15 @@ import sys
 import socket
 import asyncio
 import functools
+import threading
 import urllib.parse
 
 from .common import IPTOS_LOWDELAY, DEFAULT_LIMIT, ConnectionEOFError, ConnectionTimeoutError, log
 
 
 PY_37 = sys.version_info >= (3, 7)
+
+_LOCK = threading.Lock()
 
 
 def ensure_connection(f):
@@ -16,17 +19,22 @@ def ensure_connection(f):
 
     @functools.wraps(f)
     async def wrapper(self, *args, **kwargs):
-        if self.auto_reconnect and not self.connected():
-            await self.open()
+        if self._lock is None:
+            with _LOCK:
+                if self._lock is None:
+                    self._lock = asyncio.Lock()
         timeout = kwargs.pop("timeout", self.timeout)
-        coro = f(self, *args, **kwargs)
-        if timeout is not None:
-            coro = asyncio.wait_for(coro, timeout)
-        try:
-            return await coro
-        except asyncio.TimeoutError as error:
-            msg = "{} call timeout on '{}:{}'".format(name, self.host, self.port)
-            raise ConnectionTimeoutError(msg) from error
+        async with self._lock:
+            if self.auto_reconnect and not self.connected():
+                await self.open()
+            coro = f(self, *args, **kwargs)
+            if timeout is not None:
+                coro = asyncio.wait_for(coro, timeout)
+            try:
+                return await coro
+            except asyncio.TimeoutError as error:
+                msg = "{} call timeout on '{}:{}'".format(name, self.host, self.port)
+                raise ConnectionTimeoutError(msg) from error
 
     return wrapper
 
@@ -239,6 +247,7 @@ class TCP:
         self.keep_alive = keep_alive
         self.reader = None
         self.writer = None
+        self._lock = None
         self._log = log.getChild("TCP({}:{})".format(host, port))
 
     def __del__(self):
