@@ -9,6 +9,7 @@ from sockio.aio import (
     ConnectionEOFError,
     LineStream,
     BlockStream,
+    socket_for_url
 )
 
 from conftest import IDN_REQ, IDN_REP, WRONG_REQ, WRONG_REP
@@ -613,3 +614,27 @@ async def test_block_stream(aio_tcp):
     assert i == 5
     assert aio_tcp.connection_counter == 1
     assert not aio_tcp.connected()
+
+
+@pytest.mark.asyncio
+async def test_socket_for_url(aio_server):
+    host, port = aio_server.sockets[0].getsockname()
+
+    with pytest.raises(ValueError):
+        socket_for_url("udp://{}:{}".format(host, port))
+
+    aio_tcp = socket_for_url("tcp://{}:{}".format(host, port))
+
+    assert not aio_tcp.connected()
+    assert aio_tcp.connection_counter == 0
+
+    await aio_tcp.open()
+    assert aio_tcp.connected()
+    assert aio_tcp.connection_counter == 1
+
+    coro = aio_tcp.write_readline(IDN_REQ)
+    assert asyncio.iscoroutine(coro)
+    reply = await coro
+    assert aio_tcp.connected()
+    assert aio_tcp.connection_counter == 1
+    assert reply == IDN_REP
