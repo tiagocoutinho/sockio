@@ -521,6 +521,19 @@ async def test_read(aio_tcp):
 
 
 @pytest.mark.asyncio
+async def test_readbuffer(aio_tcp):
+    for request, expected in [(IDN_REQ, IDN_REP), (WRONG_REQ, WRONG_REP)]:
+        await aio_tcp.write(request)
+        assert aio_tcp.connected()
+        for i in range(10):
+           if aio_tcp.in_waiting() >= len(expected):
+               break
+           await asyncio.sleep(0.001)
+        reply = await aio_tcp.readbuffer()
+        assert expected == reply
+
+
+@pytest.mark.asyncio
 async def test_parallel_rw(aio_tcp):
     async def wr(request, expected_reply):
         reply = await aio_tcp.write_readline(request)
