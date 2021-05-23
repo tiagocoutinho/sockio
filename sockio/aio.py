@@ -8,9 +8,11 @@ import urllib.parse
 from .common import IPTOS_LOWDELAY, DEFAULT_LIMIT, ConnectionEOFError, ConnectionTimeoutError, log
 
 
-PY_37 = sys.version_info >= (3, 7)
+_PY_37 = sys.version_info >= (3, 7)
 
 _LOCK = threading.Lock()
+
+DFT_KEEP_ALIVE = dict(active=1, idle=60, retry=3, interval=10)
 
 
 def ensure_connection(f):
@@ -108,7 +110,7 @@ class StreamReader(asyncio.StreamReader):
         self._buffer.clear()
 
 
-def configure_socket(sock, no_delay=True, tos=IPTOS_LOWDELAY, keep_alive=None):
+def configure_socket(sock, no_delay=True, tos=IPTOS_LOWDELAY, keep_alive=DFT_KEEP_ALIVE):
     if hasattr(socket, "TCP_NODELAY") and no_delay:
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     if hasattr(socket, "IP_TOS"):
@@ -140,7 +142,7 @@ async def open_connection(
     on_eof_received=None,
     no_delay=True,
     tos=IPTOS_LOWDELAY,
-    keep_alive=None
+    keep_alive=DFT_KEEP_ALIVE
 ):
     if loop is None:
         loop = asyncio.get_event_loop()
@@ -229,7 +231,7 @@ class TCP:
         tos=IPTOS_LOWDELAY,
         connection_timeout=None,
         timeout=None,
-        keep_alive=None,
+        keep_alive=DFT_KEEP_ALIVE,
     ):
         self.host = host
         self.port = port
@@ -303,7 +305,7 @@ class TCP:
         try:
             if self.writer is not None:
                 self.writer.close()
-                if PY_37:
+                if _PY_37:
                     await self.writer.wait_closed()
         finally:
             self.reader = None
