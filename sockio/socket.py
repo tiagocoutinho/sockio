@@ -132,7 +132,6 @@ class RawTCP:
             self._log.error("Error running %s: %r", cb.__name__, error)
 
     async def _read_loop(self):
-        loop = asyncio.get_event_loop()
         sock = self._sock
         try:
             async for data in stream_reader(sock):
@@ -178,6 +177,7 @@ class RawTCP:
             tos=self.tos,
             keep_alive=self.keep_alive
         )
+        self._read_error = None
         self._read_task = asyncio.create_task(self._read_loop())
 
     async def close(self):
