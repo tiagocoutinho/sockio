@@ -7,7 +7,8 @@ import functools
 from .common import IPTOS_LOWDELAY, ConnectionEOFError, ConnectionTimeoutError, log
 
 
-def configure_socket(sock, no_delay=True, tos=IPTOS_LOWDELAY, keep_alive=None):
+def configure_tcp_socket(sock, no_delay=True, tos=IPTOS_LOWDELAY, keep_alive=None):
+    sock.setblocking(False)
     if hasattr(socket, "TCP_NODELAY") and no_delay:
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     if hasattr(socket, "IP_TOS"):
@@ -29,7 +30,13 @@ def configure_socket(sock, no_delay=True, tos=IPTOS_LOWDELAY, keep_alive=None):
             sock.setsockopt(socket.SOL_TCP, socket.TCP_KEEPCNT, retry)
 
 
-async def open_connection(
+def create_tcp_socket(no_delay=True, tos=IPTOS_LOWDELAY, keep_alive=None):
+    sock = socket.socket()
+    configure_tcp_socket(sock, no_delay=no_delay, tos=tos, keep_alive=keep_alive)
+    return sock
+
+
+async def open_tcp_connection(
     host=None,
     port=None,
     loop=None,
@@ -39,9 +46,7 @@ async def open_connection(
 ):
     if loop is None:
         loop = asyncio.get_event_loop()
-    sock = socket.socket()
-    sock.setblocking(False)
-    configure_socket(sock, no_delay=no_delay, tos=tos, keep_alive=keep_alive)
+    sock = create_tcp_socket(no_delay=no_delay, tos=tos, keep_alive=keep_alive)
     await loop.sock_connect(sock, (host, port))
     return sock
 
@@ -170,7 +175,7 @@ class RawTCP:
         if self.connected():
             code = errno.EISCONN
             raise OSError(code, os.strerror(code))
-        self._sock = await open_connection(
+        self._sock = await open_tcp_connection(
             self.host,
             self.port,
             no_delay=self.no_delay,
@@ -276,6 +281,7 @@ class TCP:
         return "{}({}, {})".format(type(self).__name__, self.host, self.port)
 
     async def _on_connection_made(self):
+        self.connection_counter += 1
         if self.on_connection_made is None:
             return
         try:
@@ -303,7 +309,7 @@ class TCP:
         connection_timeout = kwargs.get("timeout", self.connection_timeout)
         if self.connected():
             raise ConnectionError("socket already open")
-        self._log.debug("open connection (#%d)", self.connection_counter + 1)
+        self._log.debug("open connection (#%d)", self.connection_counter)
         sock = RawTCP(
             self.host,
             self.port,
@@ -325,7 +331,6 @@ class TCP:
             raise ConnectionTimeoutError("Connect call timeout on {}".format(addr))
         self._sock = sock
         await self._on_connection_made()
-        self.connection_counter += 1
 
     @ensure_connection
     async def write(self, data):
