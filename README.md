@@ -100,7 +100,7 @@ Before going in detail about the features, note that this abstraction comes
 with a price. Intentionally, when comparing with low level socket API, the
 following features are no longer available:
 
-1. The cability of controlling the two ends of the socket independently
+1. The capability of controlling the two ends of the socket independently
    (ex: close the write end)
 2. While the low level `socket.recv()` returns empty string when EOF is reached,
    the TCP class raises `ConnectionEOFError` instead and closes both ends of
