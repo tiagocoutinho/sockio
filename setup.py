@@ -23,9 +23,10 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "License :: OSI Approved :: GNU Lesser General Public License v2 or later (LGPLv2+)"
     ],
     description="Concurrency agnostic socket API",
-    license="GPLv3+",
+    license="LGPL-2.1",
     long_description=description,
     long_description_content_type="text/markdown",
     keywords="socket, asyncio",
